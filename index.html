@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fireworks Designer</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Toast notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Add/Edit Launch Modal -->
+    <div id="launch-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="launch-modal-title">Add Firework Launch</h2>
+                <button class="modal-close" onclick="closeLaunchModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Launch Time</label>
+                    <div class="time-input-group">
+                        <input type="number" id="launch-time-min" min="0" max="59" value="0" class="time-input">
+                        <span>:</span>
+                        <input type="number" id="launch-time-sec" min="0" max="59" value="0" class="time-input">
+                        <span class="time-label">min : sec</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Launcher Position</label>
+                    <div id="launcher-select" class="launcher-select">
+                        <!-- Launcher buttons populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Firework Type</label>
+                    <select id="firework-type" class="form-select">
+                        <optgroup label="Classic">
+                            <option value="chrysanthemum">Chrysanthemum - Classic spherical burst</option>
+                            <option value="willow">Willow - Drooping trails</option>
+                            <option value="palm">Palm - Upward palm shape</option>
+                            <option value="peony">Peony - Dense round burst</option>
+                            <option value="crackle">Crackle - With mini explosions</option>
+                            <option value="ring">Ring - Circular ring shape</option>
+                            <option value="heart">Heart - Heart-shaped burst</option>
+                            <option value="comet">Comet - Single rising trail</option>
+                        </optgroup>
+                        <optgroup label="Special Effects">
+                            <option value="crossette">Crossette - Splits mid-flight</option>
+                            <option value="brocade">Brocade - Gold/silver glitter</option>
+                            <option value="strobe">Strobe - Flashing effect</option>
+                            <option value="waterfall">Waterfall - Cascading sparks</option>
+                            <option value="saturn">Saturn - Ring around burst</option>
+                            <option value="spider">Spider - Long burning legs</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>Primary Color</label>
+                        <input type="color" id="primary-color" value="#ff0000" class="color-input">
+                    </div>
+                    <div class="form-group half">
+                        <label>Secondary Color</label>
+                        <input type="color" id="secondary-color" value="#ffaa00" class="color-input">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>Size</label>
+                        <select id="firework-size" class="form-select">
+                            <option value="small">Small</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="large">Large</option>
+                        </select>
+                    </div>
+                    <div class="form-group half">
+                        <label>Height</label>
+                        <select id="firework-height" class="form-select">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high" selected>High</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Trail Effect</label>
+                    <select id="firework-trail" class="form-select">
+                        <option value="none">None</option>
+                        <option value="sparkle" selected>Sparkle</option>
+                        <option value="comet">Comet</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeLaunchModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveLaunchEvent()">Add Launch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Show Settings</h2>
+                <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Launcher Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">Launchers</h3>
+                    <p class="settings-hint">Drag launchers on canvas to reposition them</p>
+
+                    <div class="settings-row">
+                        <div class="settings-buttons">
+                            <button id="btn-add-launcher" class="btn btn-sm btn-primary" title="Add Launcher">+ Add Launcher</button>
+                            <button id="btn-remove-launcher" class="btn btn-sm btn-secondary" title="Remove Selected Launcher">- Remove Selected</button>
+                        </div>
+                        <span id="launcher-count" class="launcher-count-badge">5 / 10</span>
+                    </div>
+                </div>
+
+                <!-- Weather Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">Weather Effects</h3>
+
+                    <div class="settings-row">
+                        <label class="settings-label">Wind Speed</label>
+                        <div class="settings-control">
+                            <input type="range" id="wind-speed" min="0" max="100" value="0" class="settings-slider">
+                            <span id="wind-speed-label" class="settings-value">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-row">
+                        <label class="settings-label">Wind Direction</label>
+                        <div class="settings-control">
+                            <select id="wind-direction" class="settings-select">
+                                <option value="left">&larr; Left</option>
+                                <option value="right" selected>&rarr; Right</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Smoke Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">Smoke Effects</h3>
+
+                    <div class="settings-row">
+                        <label class="settings-label">Enable Smoke</label>
+                        <div class="settings-control">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="smoke-enabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-row smoke-control" style="display: none;">
+                        <label class="settings-label">Smoke Density</label>
+                        <div class="settings-control">
+                            <input type="range" id="smoke-density" min="1" max="5" value="3" class="settings-slider">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audio Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">Audio</h3>
+
+                    <div class="settings-row">
+                        <label class="settings-label">Enable Sound</label>
+                        <div class="settings-control">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="sound-enabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-row sound-control">
+                        <label class="settings-label">Volume</label>
+                        <div class="settings-control">
+                            <input type="range" id="volume-slider" min="0" max="100" value="50" class="settings-slider">
+                            <span id="volume-label" class="settings-value">50%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Finale Settings Modal -->
+    <div id="finale-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h2>Finale Settings</h2>
+                <button class="modal-close" onclick="closeFinaleModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>Duration</label>
+                        <select id="finale-duration" class="form-select">
+                            <option value="5000">5 seconds - Quick burst</option>
+                            <option value="10000" selected>10 seconds - Classic</option>
+                            <option value="15000">15 seconds - Extended</option>
+                            <option value="20000">20 seconds - Grand</option>
+                            <option value="30000">30 seconds - Epic</option>
+                        </select>
+                    </div>
+                    <div class="form-group half">
+                        <label>Firework Count</label>
+                        <select id="finale-count" class="form-select">
+                            <option value="10">10 - Light</option>
+                            <option value="20">20 - Medium</option>
+                            <option value="30" selected>30 - Heavy</option>
+                            <option value="40">40 - Intense</option>
+                            <option value="50">50 - Maximum</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Intensity Pattern</label>
+                    <div class="intensity-options">
+                        <label class="radio-card">
+                            <input type="radio" name="finale-intensity" value="gradual" checked>
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Gradual Buildup</span>
+                                <span class="radio-card-desc">Starts slow, builds to climax</span>
+                            </span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="finale-intensity" value="steady">
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Steady</span>
+                                <span class="radio-card-desc">Even pacing throughout</span>
+                            </span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="finale-intensity" value="chaos">
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Instant Chaos</span>
+                                <span class="radio-card-desc">All out from the start!</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Color Theme</label>
+                    <div class="color-theme-grid">
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="random" checked>
+                            <span class="theme-swatch theme-random">
+                                <span class="theme-name">Random</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="patriotic">
+                            <span class="theme-swatch theme-patriotic">
+                                <span class="theme-name">Patriotic</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="golden">
+                            <span class="theme-swatch theme-golden">
+                                <span class="theme-name">Golden</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="ocean">
+                            <span class="theme-swatch theme-ocean">
+                                <span class="theme-name">Ocean</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="sunset">
+                            <span class="theme-swatch theme-sunset">
+                                <span class="theme-name">Sunset</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="forest">
+                            <span class="theme-swatch theme-forest">
+                                <span class="theme-name">Forest</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="candy">
+                            <span class="theme-swatch theme-candy">
+                                <span class="theme-name">Candy</span>
+                            </span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="finale-theme" value="custom">
+                            <span class="theme-swatch theme-custom">
+                                <span class="theme-name">Custom</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="custom-colors-section" class="form-group" style="display: none;">
+                    <label>Custom Colors (pick 2-4)</label>
+                    <div class="custom-color-row">
+                        <input type="color" id="custom-color-1" value="#ff0000" class="color-input-sm">
+                        <input type="color" id="custom-color-2" value="#00ff00" class="color-input-sm">
+                        <input type="color" id="custom-color-3" value="#0000ff" class="color-input-sm">
+                        <input type="color" id="custom-color-4" value="#ffff00" class="color-input-sm">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Firework Types</label>
+                    <div class="type-checkbox-grid">
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="chrysanthemum" checked>
+                            <span>Chrysanthemum</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="willow" checked>
+                            <span>Willow</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="palm" checked>
+                            <span>Palm</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="peony" checked>
+                            <span>Peony</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="crackle" checked>
+                            <span>Crackle</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="ring" checked>
+                            <span>Ring</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="heart" checked>
+                            <span>Heart</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="comet" checked>
+                            <span>Comet</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="crossette" checked>
+                            <span>Crossette</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="brocade" checked>
+                            <span>Brocade</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="strobe" checked>
+                            <span>Strobe</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="waterfall" checked>
+                            <span>Waterfall</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="saturn" checked>
+                            <span>Saturn</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="spider" checked>
+                            <span>Spider</span>
+                        </label>
+                    </div>
+                    <button class="btn btn-secondary btn-xs" onclick="toggleAllTypes(true)">Select All</button>
+                    <button class="btn btn-secondary btn-xs" onclick="toggleAllTypes(false)">Deselect All</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeFinaleModal()">Cancel</button>
+                <button class="btn btn-accent" onclick="generateFinale()">Generate Finale</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main container -->
+    <div class="app-container">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button id="btn-play" class="toolbar-btn" title="Play (Space)">
+                    <span class="icon">&#9658;</span> Play
+                </button>
+                <button id="btn-pause" class="toolbar-btn" title="Pause" style="display: none;">
+                    <span class="icon">&#10074;&#10074;</span> Pause
+                </button>
+                <button id="btn-stop" class="toolbar-btn" title="Stop">
+                    <span class="icon">&#9632;</span> Stop
+                </button>
+                <div class="toolbar-divider"></div>
+                <button id="btn-undo" class="toolbar-btn" title="Nothing to undo (Ctrl+Z)" disabled>
+                    <span class="icon">&#8617;</span> Undo
+                </button>
+                <button id="btn-redo" class="toolbar-btn" title="Nothing to redo (Ctrl+Y)" disabled>
+                    <span class="icon">&#8618;</span> Redo
+                </button>
+            </div>
+            <div class="toolbar-center">
+                <h1>Fireworks Designer</h1>
+            </div>
+            <div class="toolbar-right">
+                <select id="playback-speed" class="speed-select" title="Playback Speed">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                </select>
+                <label class="loop-toggle">
+                    <input type="checkbox" id="loop-checkbox">
+                    <span>Loop</span>
+                </label>
+                <span id="time-display" class="time-display">0:00 / 0:30</span>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <!-- Canvas area -->
+            <div class="canvas-container">
+                <!-- Settings link on right side -->
+                <a href="#" class="settings-link" onclick="openSettingsModal(); return false;" title="Show Settings">
+                    <span class="settings-icon">&#9881;</span>
+                    <span class="settings-text">Settings</span>
+                </a>
+
+                <canvas id="fireworks-canvas" width="800" height="500"></canvas>
+                <!-- Launcher indicators will be drawn on canvas -->
+            </div>
+
+            <!-- Schedule panel -->
+            <div class="schedule-panel">
+                <div class="schedule-header">
+                    <h3>Launch Schedule</h3>
+                    <div class="schedule-actions">
+                        <button id="btn-add-launch" class="btn btn-primary btn-sm">+ Add Launch</button>
+                        <button id="btn-add-finale" class="btn btn-accent btn-sm">Add Finale</button>
+                        <button id="btn-clear-all" class="btn btn-danger btn-sm">Clear All</button>
+                    </div>
+                </div>
+
+                <div id="event-list" class="event-list">
+                    <!-- Events will be populated here -->
+                    <div class="empty-state">
+                        <p>No fireworks scheduled yet!</p>
+                        <p class="hint">Click "Add Launch" to schedule your first firework.</p>
+                    </div>
+                </div>
+
+                <!-- Timeline scrubber -->
+                <div class="timeline-container">
+                    <div class="timeline-ruler">
+                        <span class="time-mark">0:00</span>
+                        <span class="time-mark">0:10</span>
+                        <span class="time-mark">0:20</span>
+                        <span class="time-mark">0:30</span>
+                    </div>
+                    <div class="timeline-track" id="timeline-track">
+                        <div class="timeline-progress" id="timeline-progress"></div>
+                        <div class="playhead" id="playhead"></div>
+                        <!-- Event markers will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default project data for new shows
+        const APPLICATION_ID = null;
+        const PROJECT_ID = null;
+        const LOGIN_ID = null;
+        const INITIAL_DATA = {
+            version: '1.0',
+            settings: { duration: 30000, backgroundColor: '#0a0a1a', showStars: true },
+            audio: { enabled: true, volume: 50, crowdEnabled: true },
+            launchers: [
+                { id: 1, x: 100, enabled: true },
+                { id: 2, x: 250, enabled: true },
+                { id: 3, x: 400, enabled: true },
+                { id: 4, x: 550, enabled: true },
+                { id: 5, x: 700, enabled: true }
+            ],
+            events: []
+        };
+    </script>
+    <script src="js/particle.js"></script>
+    <script src="js/types.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="js/firework.js"></script>
+    <script src="js/launcher.js"></script>
+    <script src="js/show.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/saveload.js"></script>
+</body>
+</html>

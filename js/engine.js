@@ -553,6 +553,113 @@ function getShowData() {
 }
 
 /**
+ * Render the show's most spectacular moment to an offscreen canvas for the
+ * project thumbnail. Finds the time with the most simultaneous bursts,
+ * simulates just those fireworks (muted, no smoke), and returns a PNG
+ * data URL. Returns null if there is nothing to show.
+ */
+function renderShowPreview() {
+    if (!show || show.events.length === 0) return null;
+
+    // Score candidate moments: one per event, ~1.5s after launch. Shells
+    // burst around 0.8s and read brightest from ~1.0s to ~2.2s of age,
+    // before the particles fade out.
+    const weights = { small: 1, medium: 2, large: 3 };
+    const candidates = [...new Set(show.events.map(e => e.time + 1500))];
+    let bestT = 0;
+    let bestScore = -1;
+    candidates.forEach(T => {
+        let score = 0;
+        show.events.forEach(e => {
+            const age = T - e.time;
+            if (age >= 1000 && age <= 2200) {
+                score += weights[e.size] || 2;
+            }
+        });
+        if (score > bestScore || (score === bestScore && T > bestT)) {
+            bestScore = score;
+            bestT = T;
+        }
+    });
+    if (bestScore <= 0) return null;
+
+    // Mute audio and disable smoke while simulating offscreen
+    window.PREVIEW_MUTED = true;
+    const savedSmoke = smokeManager;
+    smokeManager = null;
+
+    try {
+        // Simulate every firework that would be visible at the chosen moment
+        const fireworks = [];
+        show.events.forEach(e => {
+            const age = (bestT - e.time) / 1000;
+            if (age < 0 || age > 4.5) return;
+
+            const launcher = launcherManager.getLauncherById(e.launcherId);
+            if (!launcher) return;
+            const pos = launcher.getLaunchPosition();
+
+            const fw = new Firework({
+                launchX: pos.x,
+                launchY: pos.y,
+                type: e.type,
+                primaryColor: e.primaryColor,
+                secondaryColor: e.secondaryColor,
+                size: e.size,
+                height: e.height,
+                trail: e.trail
+            });
+
+            const step = 1 / 30;
+            for (let t = 0; t < age && fw.phase !== 'done'; t += step) {
+                fw.update(step);
+            }
+            if (fw.phase !== 'done') {
+                fireworks.push(fw);
+            }
+        });
+
+        if (fireworks.length === 0) return null;
+
+        // Render one frame at logic resolution (plenty for gallery cards)
+        const off = document.createElement('canvas');
+        off.width = LOGIC_WIDTH;
+        off.height = LOGIC_HEIGHT;
+        const octx = off.getContext('2d');
+
+        octx.fillStyle = backgroundColor;
+        octx.fillRect(0, 0, LOGIC_WIDTH, LOGIC_HEIGHT);
+
+        stars.forEach(star => {
+            octx.save();
+            octx.globalAlpha = star.brightness * 0.8;
+            octx.fillStyle = '#ffffff';
+            octx.beginPath();
+            octx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            octx.fill();
+            octx.restore();
+        });
+
+        const groundGradient = octx.createLinearGradient(0, LOGIC_HEIGHT - 50, 0, LOGIC_HEIGHT);
+        groundGradient.addColorStop(0, 'transparent');
+        groundGradient.addColorStop(1, 'rgba(30, 30, 50, 0.8)');
+        octx.fillStyle = groundGradient;
+        octx.fillRect(0, LOGIC_HEIGHT - 50, LOGIC_WIDTH, 50);
+
+        fireworks.forEach(fw => fw.draw(octx));
+        launcherManager.draw(octx);
+
+        return off.toDataURL('image/png');
+    } catch (err) {
+        console.error('Preview render failed:', err);
+        return null;
+    } finally {
+        smokeManager = savedSmoke;
+        window.PREVIEW_MUTED = false;
+    }
+}
+
+/**
  * Mark project as dirty (unsaved changes)
  */
 function markDirty() {

@@ -182,8 +182,10 @@ class Firework {
             const volumeMult = this.size === 'large' ? 1.0 : this.size === 'medium' ? 0.8 : 0.6;
             playSound(boomVariant, volumeMult);
 
-            // Trigger crowd cheer after burst (with delay for realism)
-            if (typeof triggerCrowdCheer === 'function') {
+            // Trigger crowd cheer after burst (with delay for realism).
+            // Don't even schedule it during offscreen preview renders, since
+            // the mute flag will already be cleared when the timeout fires.
+            if (typeof triggerCrowdCheer === 'function' && !window.PREVIEW_MUTED) {
                 setTimeout(() => triggerCrowdCheer(this.size), 300);
             }
         }

@@ -203,6 +203,7 @@ function initAudioUI() {
  * @param {number} volumeMultiplier - Volume multiplier (0-1)
  */
 function playSound(name, volumeMultiplier = 1.0) {
+    if (window.PREVIEW_MUTED) return; // Silent during offscreen preview renders
     if (!audio.enabled || !audioContext) return;
 
     // Resume context if needed
@@ -540,6 +541,7 @@ function stopCrowdAmbience() {
  * @param {string} size - Firework size (small, medium, large)
  */
 function triggerCrowdCheer(size) {
+    if (window.PREVIEW_MUTED) return; // Silent during offscreen preview renders
     if (!audio.enabled || !audio.crowdEnabled) return;
 
     // Only play if we have real audio files loaded

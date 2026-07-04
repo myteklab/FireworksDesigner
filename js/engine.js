@@ -65,6 +65,11 @@ function initEngine() {
         initWeather();
     }
 
+    // Initialize scenery controls (if available)
+    if (typeof initScenery === 'function') {
+        initScenery();
+    }
+
     // Initialize audio system (if available)
     if (typeof initAudio === 'function') {
         initAudio();
@@ -408,8 +413,15 @@ function render(timestamp) {
         drawStars(timestamp);
     }
 
-    // Draw ground/horizon
-    drawGround();
+    // Draw backdrop silhouette (behind fireworks)
+    if (typeof drawBackdrop === 'function') {
+        drawBackdrop(ctx);
+    }
+
+    // Draw ground/horizon (the lake replaces it when water is on)
+    if (typeof scenery === 'undefined' || !scenery.water) {
+        drawGround();
+    }
 
     // Update smoke (if weather system is loaded)
     if (typeof smokeManager !== 'undefined' && smokeManager) {
@@ -433,6 +445,12 @@ function render(timestamp) {
         if (testFireworks.length === 0 && typeof onTestFireworksDone === 'function') {
             onTestFireworksDone();
         }
+    }
+
+    // Lake reflection mirrors everything drawn so far (sky + bursts)
+    if (typeof drawWater === 'function') {
+        drawWater(ctx, canvas, renderScale, timestamp);
+        drawBarges(ctx, launcherManager.launchers);
     }
 
     // Update and draw launchers (always, so flash/spark effects animate
@@ -642,13 +660,25 @@ function renderShowPreview() {
             octx.restore();
         });
 
-        const groundGradient = octx.createLinearGradient(0, LOGIC_HEIGHT - 50, 0, LOGIC_HEIGHT);
-        groundGradient.addColorStop(0, 'transparent');
-        groundGradient.addColorStop(1, 'rgba(30, 30, 50, 0.8)');
-        octx.fillStyle = groundGradient;
-        octx.fillRect(0, LOGIC_HEIGHT - 50, LOGIC_WIDTH, 50);
+        if (typeof drawBackdrop === 'function') {
+            drawBackdrop(octx);
+        }
+
+        if (typeof scenery === 'undefined' || !scenery.water) {
+            const groundGradient = octx.createLinearGradient(0, LOGIC_HEIGHT - 50, 0, LOGIC_HEIGHT);
+            groundGradient.addColorStop(0, 'transparent');
+            groundGradient.addColorStop(1, 'rgba(30, 30, 50, 0.8)');
+            octx.fillStyle = groundGradient;
+            octx.fillRect(0, LOGIC_HEIGHT - 50, LOGIC_WIDTH, 50);
+        }
 
         fireworks.forEach(fw => fw.draw(octx));
+
+        if (typeof drawWater === 'function') {
+            drawWater(octx, off, 1, 0);
+            drawBarges(octx, launcherManager.launchers);
+        }
+
         launcherManager.draw(octx);
 
         return off.toDataURL('image/png');

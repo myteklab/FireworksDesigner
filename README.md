@@ -14,6 +14,7 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 - Drag-and-drop launcher positioning (up to 10 launchers)
 - Finale generator with launch patterns (Sweep, Ping-Pong, Volleys, Random), intensity curves, grand ending barrage, color themes, start time, and firework types
 - Finales appear as one collapsible group in the schedule and play immediately after generating
+- Scenery backdrops (City Skyline, Mountains, Forest, Rooftops) with a lake reflection option that mirrors your fireworks live on the water
 - Real-time canvas rendering with twinkling stars and ground effects
 - Responsive display that scales to the window, with touch support
 - Synthesized sound effects (launch whoosh, burst explosions, crackle)

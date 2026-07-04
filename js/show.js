@@ -488,12 +488,18 @@ class Show {
             audioSettings = getAudioSettings();
         }
 
+        const scenerySettings = (typeof getScenerySettings === 'function')
+            ? getScenerySettings()
+            : { backdrop: 'none', water: false };
+
         return {
             version: '1.0',
             settings: {
                 duration: this.duration,
                 backgroundColor: '#0a0a1a',
-                showStars: true
+                showStars: true,
+                backdrop: scenerySettings.backdrop,
+                water: scenerySettings.water
             },
             weather: weatherSettings,
             audio: audioSettings,
@@ -526,6 +532,11 @@ class Show {
         // Load settings
         if (data.settings) {
             this.duration = data.settings.duration || 30000;
+        }
+
+        // Load scenery (backdrop + water)
+        if (typeof loadScenerySettings === 'function') {
+            loadScenerySettings(data.settings);
         }
 
         // Load weather settings if available

@@ -132,7 +132,7 @@ class Firework {
         if (this.rocket.y <= this.burstY || this.rocket.vy >= 0) {
             // Play whoosh sound as rocket reaches peak
             if (typeof playSound === 'function') {
-                playSound('whoosh', 0.7);
+                playSound('whoosh', 0.7, { x: this.rocket.x });
             }
 
             this.x = this.rocket.x;
@@ -190,11 +190,16 @@ class Firework {
      * Create burst particles
      */
     burst() {
-        // Play boom sound
+        // Screen bloom + camera shake for the big moments
+        if (typeof registerBurstEffects === 'function') {
+            registerBurstEffects(this.x, this.y, this.primaryColor, this.size);
+        }
+
+        // Play boom sound from where the shell actually burst
         if (typeof playSound === 'function') {
             const boomVariant = 'boom' + (Math.floor(Math.random() * 3) + 1);
             const volumeMult = this.size === 'large' ? 1.0 : this.size === 'medium' ? 0.8 : 0.6;
-            playSound(boomVariant, volumeMult);
+            playSound(boomVariant, volumeMult, { x: this.x, y: this.y });
 
             // Trigger crowd cheer after burst (with delay for realism).
             // Don't even schedule it during offscreen preview renders, since
@@ -552,7 +557,7 @@ class Firework {
 
         // Play a subtle crackle for the split
         if (typeof playSound === 'function') {
-            playSound('crackle', 0.4);
+            playSound('crackle', 0.4, { x: this.x, y: this.y });
         }
     }
 
@@ -562,7 +567,7 @@ class Firework {
     triggerSecondaryBurst() {
         // Play crackle sound
         if (typeof playSound === 'function') {
-            playSound('crackle', 0.6);
+            playSound('crackle', 0.6, { x: this.x, y: this.y });
         }
 
         // Select random particles to burst

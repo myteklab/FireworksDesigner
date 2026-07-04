@@ -24,6 +24,25 @@ let selectedLauncherForRemoval = null;
 // Test fireworks (fired from the launch modal, run outside show playback)
 let testFireworks = [];
 
+// Spectacle effects: brief sky bloom on big bursts + camera shake
+let burstFlashes = [];
+let shakeMag = 0;
+
+/**
+ * Called from Firework.burst(). Large shells light up the whole sky for
+ * an instant and kick the camera; mediums get a softer bloom.
+ */
+function registerBurstEffects(x, y, color, size) {
+    if (window.PREVIEW_MUTED) return; // Not during thumbnail simulation
+
+    if (size === 'large') {
+        burstFlashes.push({ color: color, age: 0, strength: 0.11 });
+        shakeMag = Math.min(7, shakeMag + 2.4);
+    } else if (size === 'medium') {
+        burstFlashes.push({ color: color, age: 0, strength: 0.05 });
+    }
+}
+
 /**
  * Initialize the engine
  */
@@ -404,9 +423,17 @@ function render(timestamp) {
     // Scale all drawing from logical coordinates to the buffer size
     ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
 
-    // Clear canvas
+    // Camera shake from big bursts (drawing only; input math is unaffected)
+    if (shakeMag > 0.05) {
+        ctx.translate((Math.random() - 0.5) * 2 * shakeMag, (Math.random() - 0.5) * 2 * shakeMag);
+        shakeMag *= Math.exp(-6 * cappedDt);
+    } else {
+        shakeMag = 0;
+    }
+
+    // Clear canvas (oversized so shake never exposes bare buffer edges)
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, LOGIC_WIDTH, LOGIC_HEIGHT);
+    ctx.fillRect(-10, -10, LOGIC_WIDTH + 20, LOGIC_HEIGHT + 20);
 
     // Draw background stars
     if (showStars) {
@@ -444,6 +471,29 @@ function render(timestamp) {
         testFireworks.forEach(fw => fw.draw(ctx));
         if (testFireworks.length === 0 && typeof onTestFireworksDone === 'function') {
             onTestFireworksDone();
+        }
+    }
+
+    // Sky bloom: brief additive lift when big shells burst
+    if (burstFlashes.length > 0) {
+        burstFlashes = burstFlashes.filter(f => {
+            f.age += cappedDt;
+            return f.age < 0.3;
+        });
+        if (burstFlashes.length > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            // Scale down when many flashes overlap so finales don't whiteout
+            const damp = Math.min(1, 2.5 / burstFlashes.length);
+            burstFlashes.forEach(f => {
+                const alpha = f.strength * (1 - f.age / 0.3) * damp;
+                if (alpha > 0.004) {
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = f.color;
+                    ctx.fillRect(-10, -10, LOGIC_WIDTH + 20, LOGIC_HEIGHT + 20);
+                }
+            });
+            ctx.restore();
         }
     }
 

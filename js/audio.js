@@ -197,7 +197,7 @@ function initAudioUI() {
  * @param {string} name - Sound name (whoosh, boom1, boom2, boom3, crackle, crowdCheer)
  * @param {number} volumeMultiplier - Volume multiplier (0-1)
  */
-function playSound(name, volumeMultiplier = 1.0) {
+function playSound(name, volumeMultiplier = 1.0, spatial = null) {
     if (window.PREVIEW_MUTED) return; // Silent during offscreen preview renders
     if (!audio.enabled || !audioContext) return;
 
@@ -206,17 +206,33 @@ function playSound(name, volumeMultiplier = 1.0) {
         audioContext.resume();
     }
 
+    // Spatial cues: pan by horizontal position, soften with altitude
+    // (a burst high in the sky is farther from the viewer)
+    let volume = volumeMultiplier;
+    let pan = 0;
+    let muffleHz = null;
+    if (spatial) {
+        if (typeof spatial.x === 'number') {
+            pan = Math.max(-0.6, Math.min(0.6, ((spatial.x - 400) / 400) * 0.75));
+        }
+        if (typeof spatial.y === 'number') {
+            const altitude = Math.max(0, Math.min(1, (455 - spatial.y) / 455));
+            volume *= 1 - altitude * 0.25;
+            muffleHz = 13000 - altitude * 7500;
+        }
+    }
+
     if (useSynthetic) {
-        playSyntheticSound(name, volumeMultiplier);
+        playSyntheticSound(name, volume);
     } else {
-        playBufferedSound(name, volumeMultiplier);
+        playBufferedSound(name, volume, pan, muffleHz);
     }
 }
 
 /**
- * Play a buffered (MP3) sound
+ * Play a buffered (MP3) sound with optional pan and lowpass muffle
  */
-function playBufferedSound(name, volumeMultiplier) {
+function playBufferedSound(name, volumeMultiplier, pan = 0, muffleHz = null) {
     const buffer = soundCache[name];
     if (!buffer) {
         // Fallback to synthetic
@@ -226,12 +242,28 @@ function playBufferedSound(name, volumeMultiplier) {
 
     const source = audioContext.createBufferSource();
     const gain = audioContext.createGain();
-
     source.buffer = buffer;
     gain.gain.value = volumeMultiplier;
 
-    source.connect(gain);
-    gain.connect(masterGain);
+    // source -> [lowpass] -> gain -> [panner] -> master
+    let node = source;
+    if (muffleHz && typeof audioContext.createBiquadFilter === 'function') {
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = muffleHz;
+        node.connect(filter);
+        node = filter;
+    }
+    node.connect(gain);
+
+    let out = gain;
+    if (pan !== 0 && typeof audioContext.createStereoPanner === 'function') {
+        const panner = audioContext.createStereoPanner();
+        panner.pan.value = pan;
+        gain.connect(panner);
+        out = panner;
+    }
+    out.connect(masterGain);
 
     source.start(0);
 }

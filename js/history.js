@@ -31,7 +31,9 @@ function deepCloneState() {
             secondaryColor: e.secondaryColor,
             size: e.size,
             height: e.height,
-            trail: e.trail
+            trail: e.trail,
+            group: e.group || null,
+            groupLabel: e.groupLabel || null
         })),
         launchers: launcherManager.launchers.map(l => ({
             id: l.id,

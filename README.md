@@ -10,13 +10,14 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 - Timeline-based show choreography with precise timing
 - Draggable timeline markers to retime launches
 - Drag-and-drop launcher positioning (up to 10 launchers)
-- Finale generator with configurable intensity, color themes, and firework types
+- Finale generator with launch patterns (Sweep, Ping-Pong, Volleys, Random), intensity curves, grand ending barrage, color themes, start time, and firework types
+- Finales appear as one collapsible group in the schedule and play immediately after generating
 - Real-time canvas rendering with twinkling stars and ground effects
 - Responsive display that scales to the window, with touch support
 - Synthesized sound effects (launch whoosh, burst explosions, crackle)
 - Weather system with wind and smoke effects
 - Undo/redo with full state history
-- Keyboard shortcuts (Space to play/pause, Ctrl+Z/Y for undo/redo)
+- Keyboard shortcuts (Space to play/pause, arrow keys to scrub, Ctrl+Z/Y for undo/redo)
 - Save and load projects
 
 ## How to Use

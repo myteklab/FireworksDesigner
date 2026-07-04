@@ -235,6 +235,25 @@
                     </div>
                 </div>
 
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>Start Time</label>
+                        <div class="time-input-group">
+                            <input type="number" id="finale-start-min" min="0" max="59" value="0" class="time-input">
+                            <span>:</span>
+                            <input type="number" id="finale-start-sec" min="0" max="59" value="5" class="time-input">
+                            <span class="time-label">min : sec</span>
+                        </div>
+                    </div>
+                    <div class="form-group half">
+                        <label>Grand Ending</label>
+                        <label class="grand-ending-toggle">
+                            <input type="checkbox" id="finale-grand-ending" checked>
+                            <span>Big all-launcher barrage at the end</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Intensity Pattern</label>
                     <div class="intensity-options">
@@ -257,6 +276,40 @@
                             <span class="radio-card-content">
                                 <span class="radio-card-title">Instant Chaos</span>
                                 <span class="radio-card-desc">All out from the start!</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Launch Pattern</label>
+                    <div class="intensity-options">
+                        <label class="radio-card">
+                            <input type="radio" name="finale-pattern" value="sweep" checked>
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Sweep</span>
+                                <span class="radio-card-desc">Waves across the sky, left to right</span>
+                            </span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="finale-pattern" value="pingpong">
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Ping-Pong</span>
+                                <span class="radio-card-desc">Bounces side to side</span>
+                            </span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="finale-pattern" value="volley">
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Volleys</span>
+                                <span class="radio-card-desc">All launchers fire together in salvos</span>
+                            </span>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="finale-pattern" value="random">
+                            <span class="radio-card-content">
+                                <span class="radio-card-title">Random</span>
+                                <span class="radio-card-desc">Scattered surprise launches</span>
                             </span>
                         </label>
                     </div>

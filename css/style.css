@@ -439,6 +439,78 @@ body {
     display: none;
 }
 
+/* Grouped events (finales): one collapsible header row */
+.event-group-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(155, 89, 182, 0.12);
+    border: 1px solid rgba(155, 89, 182, 0.25);
+    border-radius: 6px;
+    margin-bottom: 5px;
+    min-height: 40px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.event-group-header:hover {
+    background: rgba(155, 89, 182, 0.2);
+}
+
+.event-group-header:hover .event-actions {
+    display: flex;
+}
+
+.group-chevron {
+    color: #b96be0;
+    font-size: 12px;
+    margin-right: 8px;
+    width: 12px;
+}
+
+.group-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e8d5f2;
+    margin-right: 8px;
+    white-space: nowrap;
+}
+
+.group-count {
+    flex: 1;
+    font-size: 11px;
+    color: #999;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.event-item.in-group {
+    margin-left: 16px;
+}
+
+/* Grand ending toggle in the finale modal */
+.grand-ending-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #bbb;
+    cursor: pointer;
+    padding: 8px 0;
+}
+
+.grand-ending-toggle input {
+    cursor: pointer;
+}
+
+.grand-ending-toggle span {
+    text-transform: none;
+    letter-spacing: normal;
+}
+
 /* Actions overlay the right edge of the row on hover, so rows keep full width */
 .event-actions {
     display: none;
@@ -967,10 +1039,12 @@ body {
 .intensity-options {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .radio-card {
     flex: 1;
+    min-width: 130px;
     cursor: pointer;
 }
 

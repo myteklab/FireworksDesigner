@@ -4,6 +4,7 @@
 
 // Current editing state
 let currentEditingEventId = null;
+let currentEditingOriginalTime = null;
 let selectedLauncherId = 1;
 
 /**
@@ -72,6 +73,15 @@ function handleKeyboard(e) {
         } else {
             show.play();
         }
+        return;
+    }
+
+    // Arrow keys to nudge the playhead (Shift for bigger steps)
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+        e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+        e.preventDefault();
+        const step = (e.shiftKey ? 5000 : 1000) * (e.key === 'ArrowLeft' ? -1 : 1);
+        show.seek(show.currentTime + step);
         return;
     }
 
@@ -219,6 +229,7 @@ function openEditLaunchModal(eventId) {
     if (!event) return;
 
     currentEditingEventId = eventId;
+    currentEditingOriginalTime = event.time;
 
     // Update launcher buttons first
     updateLauncherSelectButtons();
@@ -268,6 +279,7 @@ function closeLaunchModal() {
     modal.style.display = 'none';
     modal.classList.remove('peek');
     currentEditingEventId = null;
+    currentEditingOriginalTime = null;
 }
 
 /**
@@ -276,7 +288,14 @@ function closeLaunchModal() {
 function saveLaunchEvent() {
     const minutes = parseInt(document.getElementById('launch-time-min').value) || 0;
     const seconds = parseInt(document.getElementById('launch-time-sec').value) || 0;
-    const time = parseTime(minutes, seconds);
+    let time = parseTime(minutes, seconds);
+
+    // If editing and the time inputs weren't changed, keep the exact original
+    // time so sub-second precision (from marker drags or finales) survives
+    if (currentEditingEventId && currentEditingOriginalTime !== null &&
+        Math.floor(currentEditingOriginalTime / 1000) === minutes * 60 + seconds) {
+        time = currentEditingOriginalTime;
+    }
 
     const eventData = {
         time: time,
@@ -396,8 +415,18 @@ function addFinale() {
     document.getElementById('finale-duration').value = '10000';
     document.getElementById('finale-count').value = '30';
     document.querySelector('input[name="finale-intensity"][value="gradual"]').checked = true;
+    document.querySelector('input[name="finale-pattern"][value="sweep"]').checked = true;
     document.querySelector('input[name="finale-theme"][value="random"]').checked = true;
+    document.getElementById('finale-grand-ending').checked = true;
     document.getElementById('custom-colors-section').style.display = 'none';
+
+    // Default start time: 2s after the last scheduled event
+    const defaultStart = show.events.length > 0
+        ? Math.max(...show.events.map(e => e.time)) + 2000
+        : 5000;
+    const startSeconds = Math.round(defaultStart / 1000);
+    document.getElementById('finale-start-min').value = Math.floor(startSeconds / 60);
+    document.getElementById('finale-start-sec').value = startSeconds % 60;
 
     // Reset type checkboxes to all checked
     document.querySelectorAll('.type-checkbox-grid input[type="checkbox"]').forEach(cb => {
@@ -423,7 +452,14 @@ function generateFinale() {
     const duration = parseInt(document.getElementById('finale-duration').value);
     const count = parseInt(document.getElementById('finale-count').value);
     const intensity = document.querySelector('input[name="finale-intensity"]:checked').value;
+    const pattern = document.querySelector('input[name="finale-pattern"]:checked').value;
+    const grandEnding = document.getElementById('finale-grand-ending').checked;
     const theme = document.querySelector('input[name="finale-theme"]:checked').value;
+
+    // Start time from the modal inputs
+    const startMin = parseInt(document.getElementById('finale-start-min').value) || 0;
+    const startSec = parseInt(document.getElementById('finale-start-sec').value) || 0;
+    const startTime = parseTime(startMin, startSec);
 
     // Get custom colors if theme is custom
     let customColors = [];
@@ -452,10 +488,13 @@ function generateFinale() {
     if (typeof saveState === 'function') saveState('Add Finale');
 
     // Generate finale
-    const finaleCount = show.addFinaleWithOptions({
+    const result = show.addFinaleWithOptions({
+        startTime: startTime,
         duration: duration,
         count: count,
         intensity: intensity,
+        pattern: pattern,
+        grandEnding: grandEnding,
         theme: theme,
         customColors: customColors,
         types: selectedTypes
@@ -465,7 +504,33 @@ function generateFinale() {
     closeFinaleModal();
     refreshEventList();
     markDirty();
-    showToast(`Finale added! ${finaleCount} fireworks scheduled.`, 'success');
+    showToast(`Finale added! ${result.count} fireworks scheduled.`, 'success');
+
+    // Jump just before the finale and play it so you see it right away
+    show.seek(Math.max(0, result.startTime - 1000));
+    show.play();
+}
+
+/**
+ * Delete an entire event group (finale)
+ */
+function deleteGroup(groupId) {
+    const members = show.events.filter(e => e.group === groupId);
+    if (members.length === 0) return;
+
+    if (confirm(`Delete this finale (${members.length} fireworks)?`)) {
+        if (typeof saveState === 'function') saveState('Delete Finale');
+        members.forEach(e => {
+            show.removeEvent(e.id);
+            if (typeof selectedEventIds !== 'undefined') {
+                selectedEventIds.delete(e.id);
+            }
+        });
+        expandedGroups.delete(groupId);
+        refreshEventList();
+        markDirty();
+        showToast('Finale deleted', 'info');
+    }
 }
 
 /**
@@ -515,6 +580,34 @@ function clearAllEvents() {
     }
 }
 
+// Groups the user has expanded in the schedule list (collapsed by default)
+const expandedGroups = new Set();
+
+/**
+ * Render a single event row
+ */
+function renderEventRow(event, inGroup) {
+    const timeStr = formatTimeDetailed(event.time);
+    const typeConfig = FIREWORK_TYPES[event.type];
+    const typeName = typeConfig ? typeConfig.name : event.type;
+    const isSelected = typeof isEventSelected === 'function' && isEventSelected(event.id);
+
+    return `
+        <div class="event-item${isSelected ? ' selected' : ''}${inGroup ? ' in-group' : ''}" data-event-id="${event.id}" title="${typeName} &middot; ${event.size} &middot; ${event.height} &middot; launcher ${event.launcherId}">
+            <span class="event-time">${timeStr}</span>
+            <span class="event-launcher">${event.launcherId}</span>
+            <span class="event-color" style="background: linear-gradient(135deg, ${event.primaryColor} 50%, ${event.secondaryColor} 50%)"></span>
+            <span class="event-type">${typeName}</span>
+            <span class="event-size">(${event.size})</span>
+            <div class="event-actions">
+                <button class="event-action-btn" onclick="event.stopPropagation(); duplicateEvent('${event.id}')" title="Duplicate (+1s)">&#10697;</button>
+                <button class="event-action-btn" onclick="event.stopPropagation(); openEditLaunchModal('${event.id}')" title="Edit">&#9998;</button>
+                <button class="event-action-btn delete" onclick="event.stopPropagation(); deleteEvent('${event.id}')" title="Delete">&#128465;</button>
+            </div>
+        </div>
+    `;
+}
+
 /**
  * Refresh the event list UI
  */
@@ -534,30 +627,68 @@ function refreshEventList() {
         return;
     }
 
-    let html = '';
+    // Collect grouped events (finales); the group renders as one collapsible row
+    // positioned where its first event occurs
+    const groups = {};
+    const sequence = [];
     events.forEach(event => {
-        const timeStr = formatTimeDetailed(event.time);
-        const typeConfig = FIREWORK_TYPES[event.type];
-        const typeName = typeConfig ? typeConfig.name : event.type;
-        const isSelected = typeof isEventSelected === 'function' && isEventSelected(event.id);
+        if (event.group) {
+            if (!groups[event.group]) {
+                groups[event.group] = { label: event.groupLabel || 'Group', events: [] };
+                sequence.push({ kind: 'group', groupId: event.group });
+            }
+            groups[event.group].events.push(event);
+        } else {
+            sequence.push({ kind: 'event', event: event });
+        }
+    });
+
+    let html = '';
+    sequence.forEach(item => {
+        if (item.kind === 'event') {
+            html += renderEventRow(item.event, false);
+            return;
+        }
+
+        const group = groups[item.groupId];
+        const first = group.events[0];
+        const last = group.events[group.events.length - 1];
+        const expanded = expandedGroups.has(item.groupId);
 
         html += `
-            <div class="event-item${isSelected ? ' selected' : ''}" data-event-id="${event.id}" title="${typeName} &middot; ${event.size} &middot; ${event.height} &middot; launcher ${event.launcherId}">
-                <span class="event-time">${timeStr}</span>
-                <span class="event-launcher">${event.launcherId}</span>
-                <span class="event-color" style="background: linear-gradient(135deg, ${event.primaryColor} 50%, ${event.secondaryColor} 50%)"></span>
-                <span class="event-type">${typeName}</span>
-                <span class="event-size">(${event.size})</span>
+            <div class="event-group-header" data-group-id="${item.groupId}" title="${group.events.length} fireworks from ${formatTimeDetailed(first.time)} to ${formatTimeDetailed(last.time)} &middot; click to ${expanded ? 'collapse' : 'expand'}">
+                <span class="group-chevron">${expanded ? '&#9662;' : '&#9656;'}</span>
+                <span class="event-time">${formatTimeDetailed(first.time)}</span>
+                <span class="group-label">&#127878; ${group.label}</span>
+                <span class="group-count">${group.events.length} &middot; to ${formatTimeDetailed(last.time)}</span>
                 <div class="event-actions">
-                    <button class="event-action-btn" onclick="event.stopPropagation(); duplicateEvent('${event.id}')" title="Duplicate (+1s)">&#10697;</button>
-                    <button class="event-action-btn" onclick="event.stopPropagation(); openEditLaunchModal('${event.id}')" title="Edit">&#9998;</button>
-                    <button class="event-action-btn delete" onclick="event.stopPropagation(); deleteEvent('${event.id}')" title="Delete">&#128465;</button>
+                    <button class="event-action-btn delete" onclick="event.stopPropagation(); deleteGroup('${item.groupId}')" title="Delete entire finale">&#128465;</button>
                 </div>
             </div>
         `;
+
+        if (expanded) {
+            group.events.forEach(event => {
+                html += renderEventRow(event, true);
+            });
+        }
     });
 
     eventList.innerHTML = html;
+
+    // Group header click toggles expand/collapse
+    eventList.querySelectorAll('.event-group-header').forEach(header => {
+        header.addEventListener('click', function (e) {
+            if (e.target.closest('.event-actions')) return;
+            const groupId = this.dataset.groupId;
+            if (expandedGroups.has(groupId)) {
+                expandedGroups.delete(groupId);
+            } else {
+                expandedGroups.add(groupId);
+            }
+            refreshEventList();
+        });
+    });
 
     // Add click handlers for selection
     eventList.querySelectorAll('.event-item').forEach(item => {

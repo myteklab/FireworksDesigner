@@ -32,6 +32,8 @@ class Show {
             size: eventData.size || 'medium',
             height: eventData.height || 'high',
             trail: eventData.trail || 'sparkle',
+            group: eventData.group || null,
+            groupLabel: eventData.groupLabel || null,
             triggered: false
         };
 
@@ -135,9 +137,12 @@ class Show {
      * @param {number} options.duration - Duration in ms (5000-30000)
      * @param {number} options.count - Number of fireworks (10-50)
      * @param {string} options.intensity - 'gradual', 'steady', or 'chaos'
+     * @param {string} options.pattern - 'random', 'sweep', 'pingpong', or 'volley'
+     * @param {boolean} options.grandEnding - Add an all-launcher barrage at the end
      * @param {string} options.theme - Color theme name or 'custom'
      * @param {Array} options.customColors - Array of hex colors for custom theme
      * @param {Array} options.types - Array of allowed firework type names
+     * @returns {Object} { count, startTime, groupId }
      */
     addFinaleWithOptions(options) {
         const finaleStart = options.startTime !== null && options.startTime !== undefined
@@ -148,66 +153,127 @@ class Show {
         const finaleDuration = options.duration || 10000;
         const fireworkCount = options.count || 25;
         const intensity = options.intensity || 'gradual';
+        const pattern = options.pattern || 'random';
+        const grandEnding = options.grandEnding !== false;
         const theme = options.theme || 'random';
         const customColors = options.customColors || [];
         const allowedTypes = options.types || Object.keys(FIREWORK_TYPES).filter(t => t !== 'comet');
+        const groupId = 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 
-        // Get available launcher IDs
-        const launcherIds = this.launcherManager.launchers.map(l => l.id);
+        // Launchers sorted left-to-right so sweep patterns move across the sky
+        const sortedLaunchers = [...this.launcherManager.launchers].sort((a, b) => a.x - b.x);
+        const launcherIds = sortedLaunchers.map(l => l.id);
         const numLaunchers = launcherIds.length;
 
-        for (let i = 0; i < fireworkCount; i++) {
-            // Calculate time offset based on intensity pattern
-            const progress = i / fireworkCount;
-            let timeOffset;
-
+        // Map linear progress (0-1) to a time offset per the intensity curve
+        const timeForProgress = (progress) => {
             switch (intensity) {
+                case 'steady': return progress * finaleDuration;
+                case 'chaos': return Math.random() * finaleDuration;
                 case 'gradual':
-                    // Quadratic acceleration - builds up to climax
-                    timeOffset = progress * progress * finaleDuration;
-                    break;
-                case 'steady':
-                    // Linear distribution - even pacing
-                    timeOffset = progress * finaleDuration;
-                    break;
-                case 'chaos':
-                    // Random timing throughout
-                    timeOffset = Math.random() * finaleDuration;
-                    break;
-                default:
-                    timeOffset = progress * progress * finaleDuration;
+                default: return progress * progress * finaleDuration;
             }
+        };
 
-            // Get color palette based on theme
-            let palette;
-            if (theme === 'custom' && customColors.length > 0) {
-                palette = getCustomPalette(customColors);
-            } else {
-                palette = getThemePalette(theme);
-            }
+        const pickPalette = () => (theme === 'custom' && customColors.length > 0)
+            ? getCustomPalette(customColors)
+            : getThemePalette(theme);
 
-            // Pick random type from allowed types
-            const type = allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
-
-            // Cycle through all available launchers
-            const launcherId = launcherIds[i % numLaunchers];
-
-            finaleEvents.push({
-                time: finaleStart + timeOffset,
+        const makeEvent = (time, launcherId, size) => {
+            const palette = pickPalette();
+            return {
+                time: time,
                 launcherId: launcherId,
-                type: type,
+                type: allowedTypes[Math.floor(Math.random() * allowedTypes.length)],
                 primaryColor: palette.primary,
                 secondaryColor: palette.secondary,
-                size: ['small', 'medium', 'large'][Math.floor(Math.random() * 3)],
+                size: size,
                 height: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
-                trail: ['none', 'sparkle', 'comet'][Math.floor(Math.random() * 3)]
-            });
+                trail: ['none', 'sparkle', 'comet'][Math.floor(Math.random() * 3)],
+                group: groupId,
+                groupLabel: 'Finale'
+            };
+        };
+
+        // During a gradual buildup, sizes ramp small -> large toward the climax
+        const sizeForProgress = (progress) => {
+            if (intensity !== 'gradual') {
+                return ['small', 'medium', 'large'][Math.floor(Math.random() * 3)];
+            }
+            const bias = progress + (Math.random() - 0.5) * 0.4;
+            if (bias < 0.35) return 'small';
+            if (bias < 0.7) return 'medium';
+            return 'large';
+        };
+
+        if (pattern === 'volley') {
+            // Launchers fire together in salvos; salvo times follow the intensity curve
+            const volleyCount = Math.max(2, Math.ceil(fireworkCount / numLaunchers));
+            let made = 0;
+            for (let v = 0; v < volleyCount && made < fireworkCount; v++) {
+                const progress = volleyCount > 1 ? v / (volleyCount - 1) : 0;
+                const volleyTime = finaleStart + timeForProgress(progress);
+                for (let l = 0; l < numLaunchers && made < fireworkCount; l++) {
+                    finaleEvents.push(makeEvent(volleyTime, launcherIds[l], sizeForProgress(progress)));
+                    made++;
+                }
+            }
+        } else {
+            for (let i = 0; i < fireworkCount; i++) {
+                const progress = i / fireworkCount;
+                let launcherIndex;
+
+                switch (pattern) {
+                    case 'sweep':
+                        launcherIndex = i % numLaunchers;
+                        break;
+                    case 'pingpong': {
+                        const cycle = numLaunchers > 1 ? (numLaunchers - 1) * 2 : 1;
+                        const pos = i % cycle;
+                        launcherIndex = pos < numLaunchers ? pos : cycle - pos;
+                        break;
+                    }
+                    case 'random':
+                    default:
+                        launcherIndex = Math.floor(Math.random() * numLaunchers);
+                }
+
+                finaleEvents.push(makeEvent(
+                    finaleStart + timeForProgress(progress),
+                    launcherIds[launcherIndex],
+                    sizeForProgress(progress)
+                ));
+            }
+        }
+
+        // Grand ending: two rapid all-launcher barrages of big shells at the climax
+        if (grandEnding) {
+            const bigTypes = ['chrysanthemum', 'peony', 'brocade', 'pistil'].filter(t => allowedTypes.includes(t));
+            const endingTypes = bigTypes.length > 0 ? bigTypes : allowedTypes;
+            for (let wave = 0; wave < 2; wave++) {
+                const waveTime = finaleStart + finaleDuration + wave * 600;
+                launcherIds.forEach(id => {
+                    const palette = pickPalette();
+                    finaleEvents.push({
+                        time: waveTime,
+                        launcherId: id,
+                        type: endingTypes[Math.floor(Math.random() * endingTypes.length)],
+                        primaryColor: palette.primary,
+                        secondaryColor: palette.secondary,
+                        size: 'large',
+                        height: wave === 0 ? 'high' : 'medium',
+                        trail: 'sparkle',
+                        group: groupId,
+                        groupLabel: 'Finale'
+                    });
+                });
+            }
         }
 
         // Add all finale events
         finaleEvents.forEach(e => this.addEvent(e));
 
-        return finaleEvents.length;
+        return { count: finaleEvents.length, startTime: finaleStart, groupId: groupId };
     }
 
     /**
@@ -437,7 +503,9 @@ class Show {
                 secondaryColor: e.secondaryColor,
                 size: e.size,
                 height: e.height,
-                trail: e.trail
+                trail: e.trail,
+                group: e.group || null,
+                groupLabel: e.groupLabel || null
             }))
         };
     }

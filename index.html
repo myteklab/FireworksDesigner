@@ -441,40 +441,18 @@
                     <span>Loop</span>
                 </label>
                 <span id="time-display" class="time-display">0:00 / 0:30</span>
+                <button class="toolbar-btn" onclick="openSettingsModal()" title="Show Settings">
+                    <span class="icon">&#9881;</span>
+                </button>
             </div>
         </div>
 
-        <!-- Main content -->
+        <!-- Main content: canvas + timeline on the left, schedule panel on the right -->
         <div class="main-content">
-            <!-- Canvas area -->
-            <div class="canvas-container">
-                <!-- Settings link on right side -->
-                <a href="#" class="settings-link" onclick="openSettingsModal(); return false;" title="Show Settings">
-                    <span class="settings-icon">&#9881;</span>
-                    <span class="settings-text">Settings</span>
-                </a>
-
-                <canvas id="fireworks-canvas" width="800" height="500"></canvas>
-                <!-- Launcher indicators will be drawn on canvas -->
-            </div>
-
-            <!-- Schedule panel -->
-            <div class="schedule-panel">
-                <div class="schedule-header">
-                    <h3>Launch Schedule</h3>
-                    <div class="schedule-actions">
-                        <button id="btn-add-launch" class="btn btn-primary btn-sm">+ Add Launch</button>
-                        <button id="btn-add-finale" class="btn btn-accent btn-sm">Add Finale</button>
-                        <button id="btn-clear-all" class="btn btn-danger btn-sm">Clear All</button>
-                    </div>
-                </div>
-
-                <div id="event-list" class="event-list">
-                    <!-- Events will be populated here -->
-                    <div class="empty-state">
-                        <p>No fireworks scheduled yet!</p>
-                        <p class="hint">Click the sky or "Add Launch" to schedule your first firework.</p>
-                    </div>
+            <div class="canvas-column">
+                <div class="canvas-container">
+                    <canvas id="fireworks-canvas" width="800" height="500"></canvas>
+                    <!-- Launcher indicators will be drawn on canvas -->
                 </div>
 
                 <!-- Timeline scrubber -->
@@ -489,6 +467,26 @@
                         <div class="timeline-progress" id="timeline-progress"></div>
                         <div class="playhead" id="playhead"></div>
                         <!-- Event markers will be added here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule panel -->
+            <div class="schedule-panel">
+                <div class="schedule-header">
+                    <h3>Launch Schedule</h3>
+                    <div class="schedule-actions">
+                        <button id="btn-add-launch" class="btn btn-primary btn-sm">+ Add Launch</button>
+                        <button id="btn-add-finale" class="btn btn-accent btn-sm">&#10024; Finale</button>
+                        <button id="btn-clear-all" class="btn btn-danger btn-sm">Clear All</button>
+                    </div>
+                </div>
+
+                <div id="event-list" class="event-list">
+                    <!-- Events will be populated here -->
+                    <div class="empty-state">
+                        <p>No fireworks scheduled yet!</p>
+                        <p class="hint">Click the sky or "Add Launch" to schedule your first firework.</p>
                     </div>
                 </div>
             </div>

@@ -542,10 +542,10 @@ function refreshEventList() {
         const isSelected = typeof isEventSelected === 'function' && isEventSelected(event.id);
 
         html += `
-            <div class="event-item${isSelected ? ' selected' : ''}" data-event-id="${event.id}">
+            <div class="event-item${isSelected ? ' selected' : ''}" data-event-id="${event.id}" title="${typeName} &middot; ${event.size} &middot; ${event.height} &middot; launcher ${event.launcherId}">
                 <span class="event-time">${timeStr}</span>
                 <span class="event-launcher">${event.launcherId}</span>
-                <span class="event-color" style="background-color: ${event.primaryColor}"></span>
+                <span class="event-color" style="background: linear-gradient(135deg, ${event.primaryColor} 50%, ${event.secondaryColor} 50%)"></span>
                 <span class="event-type">${typeName}</span>
                 <span class="event-size">(${event.size})</span>
                 <div class="event-actions">
@@ -697,13 +697,24 @@ function updateTimelineRuler() {
     const duration = show.duration;
 
     // Calculate appropriate interval
-    let interval = 10000; // 10 seconds default
+    let interval = 5000; // 5 seconds default
+    if (duration > 60000) interval = 10000;
     if (duration > 120000) interval = 30000;
     if (duration > 300000) interval = 60000;
 
+    // Marks are positioned at their true percentage along the track
     let html = '';
+    let lastTime = 0;
     for (let time = 0; time <= duration; time += interval) {
-        html += `<span class="time-mark">${formatTimeDetailed(time)}</span>`;
+        const pct = (time / duration) * 100;
+        const shift = pct > 96 ? ';transform:translateX(-100%)' : '';
+        html += `<span class="time-mark" style="left:${pct.toFixed(2)}%${shift}">${formatTimeDetailed(time)}</span>`;
+        lastTime = time;
+    }
+
+    // Label the end of the show if it isn't already marked nearby
+    if ((duration - lastTime) / duration > 0.07) {
+        html += `<span class="time-mark" style="left:100%;transform:translateX(-100%)">${formatTimeDetailed(duration)}</span>`;
     }
 
     ruler.innerHTML = html;

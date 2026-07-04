@@ -129,6 +129,12 @@ body {
     margin: 0 4px;
 }
 
+@media (max-width: 900px) {
+    .toolbar-center {
+        display: none;
+    }
+}
+
 .speed-select {
     padding: 6px 10px;
     background: rgba(255, 255, 255, 0.1);
@@ -161,12 +167,21 @@ body {
     border-radius: 4px;
 }
 
-/* Main Content */
+/* Main Content: canvas column left, schedule panel right */
 .main-content {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     overflow: hidden;
+    min-height: 0;
+}
+
+.canvas-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: linear-gradient(180deg, #0a0a1a 0%, #1a1a2e 100%);
 }
 
 /* Canvas Container */
@@ -175,9 +190,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(180deg, #0a0a1a 0%, #1a1a2e 100%);
     position: relative;
-    min-height: 400px;
+    min-height: 300px;
 }
 
 #fireworks-canvas {
@@ -187,20 +201,19 @@ body {
     touch-action: none;
 }
 
-/* Schedule Panel */
+/* Schedule Panel (right sidebar) */
 .schedule-panel {
+    width: 340px;
+    flex-shrink: 0;
     background: #12121f;
-    border-top: 1px solid #2d2d4a;
-    padding: 12px 16px;
-    max-height: 250px;
+    border-left: 1px solid #2d2d4a;
+    padding: 14px;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .schedule-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 12px;
 }
 
@@ -208,11 +221,38 @@ body {
     font-size: 14px;
     font-weight: 600;
     color: #fff;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
 }
 
 .schedule-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* Stack the panel below the canvas on narrow screens */
+@media (max-width: 900px) {
+    .main-content {
+        flex-direction: column;
+    }
+
+    .schedule-panel {
+        width: auto;
+        max-height: 260px;
+        border-left: none;
+        border-top: 1px solid #2d2d4a;
+    }
+
+    .schedule-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .schedule-header h3 {
+        margin-bottom: 0;
+    }
 }
 
 /* Buttons */
@@ -273,8 +313,7 @@ body {
 .event-list {
     flex: 1;
     overflow-y: auto;
-    margin-bottom: 12px;
-    max-height: 100px;
+    min-height: 0;
 }
 
 .event-list::-webkit-scrollbar {
@@ -293,8 +332,16 @@ body {
 
 .empty-state {
     text-align: center;
-    padding: 20px;
+    padding: 40px 16px;
     color: #666;
+}
+
+.empty-state::before {
+    content: '\1F386';
+    display: block;
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.6;
 }
 
 .empty-state p {
@@ -304,16 +351,20 @@ body {
 .empty-state .hint {
     font-size: 12px;
     color: #555;
+    line-height: 1.5;
 }
 
 .event-item {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 8px 10px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 6px;
-    margin-bottom: 6px;
-    transition: all 0.2s ease;
+    margin-bottom: 5px;
+    transition: all 0.15s ease;
+    cursor: default;
+    min-height: 40px;
+    position: relative;
 }
 
 .event-item:hover {
@@ -331,33 +382,36 @@ body {
 }
 
 .event-item.selected .event-actions {
-    opacity: 1;
+    display: flex;
 }
 
 .event-time {
     font-family: 'Courier New', monospace;
     font-size: 12px;
-    color: #9b59b6;
-    margin-right: 12px;
-    min-width: 50px;
+    color: #b96be0;
+    margin-right: 10px;
+    min-width: 44px;
 }
 
 .event-launcher {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: bold;
-    margin-right: 12px;
+    color: #bbb;
+    margin-right: 8px;
 }
 
 .event-color {
     width: 16px;
     height: 16px;
+    flex-shrink: 0;
     border-radius: 50%;
     margin-right: 8px;
     border: 2px solid rgba(255, 255, 255, 0.2);
@@ -366,23 +420,40 @@ body {
 .event-type {
     flex: 1;
     font-size: 13px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .event-size {
     font-size: 11px;
     color: #888;
-    margin-left: 8px;
+    margin-left: 6px;
+    white-space: nowrap;
 }
 
+/* Hide the size hint when actions appear, so the row doesn't overflow */
+.event-item:hover .event-size,
+.event-item.selected .event-size {
+    display: none;
+}
+
+/* Actions overlay the right edge of the row on hover, so rows keep full width */
 .event-actions {
-    display: flex;
+    display: none;
     gap: 4px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 2px 2px 2px 14px;
+    background: linear-gradient(90deg, transparent, #23233a 30%);
+    border-radius: 6px;
 }
 
 .event-item:hover .event-actions {
-    opacity: 1;
+    display: flex;
 }
 
 .event-action-btn {
@@ -407,29 +478,38 @@ body {
     color: #e74c3c;
 }
 
-/* Timeline */
+/* Timeline (below the canvas) */
 .timeline-container {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 6px;
-    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.35);
+    border-top: 1px solid #2d2d4a;
+    padding: 8px 16px 12px;
 }
 
 .timeline-ruler {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 6px;
+    position: relative;
+    height: 14px;
+    margin-bottom: 4px;
 }
 
 .time-mark {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
     font-size: 10px;
-    color: #666;
+    color: #777;
     font-family: 'Courier New', monospace;
+    white-space: nowrap;
+}
+
+.time-mark:first-child {
+    transform: none;
 }
 
 .timeline-track {
-    height: 24px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
     position: relative;
     cursor: pointer;
 }
@@ -446,14 +526,15 @@ body {
 
 .playhead {
     position: absolute;
-    top: -4px;
+    top: -5px;
     width: 4px;
-    height: 32px;
-    background: #9b59b6;
+    height: 38px;
+    background: #b96be0;
     border-radius: 2px;
     cursor: ew-resize;
-    box-shadow: 0 0 8px rgba(155, 89, 182, 0.5);
+    box-shadow: 0 0 10px rgba(185, 107, 224, 0.7);
     touch-action: none;
+    z-index: 3;
 }
 
 /* Widen the playhead grab area without changing its look */
@@ -478,10 +559,11 @@ body {
     position: absolute;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 8px;
-    height: 8px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
     cursor: grab;
     touch-action: none;
 }
@@ -1211,41 +1293,12 @@ body {
 }
 
 /* ==========================================
-   Settings Link & Modal
+   Settings Modal
    ========================================== */
 
+/* Legacy floating settings link (still present in preview.html) */
 .settings-link {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(155, 89, 182, 0.4);
-    border-radius: 20px;
-    color: #ccc;
-    text-decoration: none;
-    font-size: 13px;
-    z-index: 20;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(4px);
-}
-
-.settings-link:hover {
-    background: rgba(155, 89, 182, 0.3);
-    border-color: rgba(155, 89, 182, 0.7);
-    color: #fff;
-    transform: translateY(-1px);
-}
-
-.settings-icon {
-    font-size: 16px;
-}
-
-.settings-text {
-    font-weight: 500;
+    display: none;
 }
 
 /* Settings Modal Styles */

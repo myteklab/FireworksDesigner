@@ -15,10 +15,109 @@ const textPointsCache = {};
 const TEXT_ALLOWED = /^[A-Za-z0-9 !?.'\-+=*#&]{1,14}$/;
 const MAX_SHELL_POINTS = 260;
 
+// ── Content filter for text fireworks and shell names ──────────────
+// Severe terms are blocked anywhere in the text; ambiguous short words
+// only as whole words (so CLASS, PEACOCK, HELLO stay fine). Matches the
+// platform's server-side ProfanityFilter list, plus leet normalization.
+// Shared-gallery moderation remains the backstop.
+const TEXT_BLOCK_SUBSTR = [
+    'fuck', 'cunt', 'nigg', 'faggot', 'bitch', 'whore', 'slut',
+    'asshole', 'dickhead', 'bastard', 'cocksuck', 'blowjob', 'handjob',
+    'jackass', 'dumbass', 'retard', 'wanker', 'bollock', 'goddamn',
+    'bullshit', 'jerkoff', 'porn', 'hitler', 'nazi'
+];
+const TEXT_BLOCK_WORD = [
+    'ass', 'shit', 'damn', 'hell', 'dick', 'cock', 'tits', 'piss',
+    'fag', 'crap', 'twat', 'prick', 'pussy', 'cum', 'sex', 'hoe',
+    'kys', 'kms', 'kkk', 'rape', 'stfu', 'wtf'
+];
+
+function normalizeForFilter(text) {
+    const leet = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '@': 'a', '$': 's', '!': 'i', '+': 't' };
+    return String(text).toLowerCase().split('').map(ch => leet[ch] || ch).join('');
+}
+
+function containsBlockedWord(text) {
+    const norm = normalizeForFilter(text);
+    const squeezed = norm.replace(/[^a-z]/g, '');
+    const collapsed = squeezed.replace(/(.)\1+/g, '$1'); // fuuuck -> fuck
+    if (TEXT_BLOCK_SUBSTR.some(w => squeezed.includes(w) || collapsed.includes(w))) {
+        return true;
+    }
+    const words = norm.replace(/[^a-z]/g, ' ').split(/\s+/).filter(Boolean);
+    return words.some(w => TEXT_BLOCK_WORD.includes(w) || TEXT_BLOCK_WORD.includes(w.replace(/(.)\1+/g, '$1')));
+}
+
+// ── Starter shells ──────────────────────────────────────────────────
+// Built into the app (not stored in projects); events reference them by
+// id ("builtin:star") so they work in every project and on share pages.
+const BUILTIN_SHELLS = (function () {
+    function circlePoints(count, radius, cx = 0, cy = 0) {
+        const pts = [];
+        for (let i = 0; i < count; i++) {
+            const a = (i / count) * Math.PI * 2;
+            pts.push({ x: cx + Math.cos(a) * radius, y: cy + Math.sin(a) * radius });
+        }
+        return pts;
+    }
+
+    function polygonOutline(vertices, perEdge) {
+        const pts = [];
+        for (let i = 0; i < vertices.length; i++) {
+            const a = vertices[i];
+            const b = vertices[(i + 1) % vertices.length];
+            for (let j = 0; j < perEdge; j++) {
+                const t = j / perEdge;
+                pts.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+            }
+        }
+        return pts;
+    }
+
+    // Five-pointed star outline
+    const starVerts = [];
+    for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? 1 : 0.42;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        starVerts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+    }
+
+    // Spiral winding out from the center
+    const spiralPts = [];
+    for (let i = 0; i < 40; i++) {
+        const t = i / 39;
+        const a = t * Math.PI * 4;
+        const r = 0.12 + 0.88 * t;
+        spiralPts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+    }
+
+    // Smiley: face outline, eyes, smile arc
+    const smileyPts = circlePoints(30, 1);
+    smileyPts.push(
+        { x: -0.35, y: -0.32 }, { x: -0.35, y: -0.44 }, { x: -0.28, y: -0.38 }, { x: -0.42, y: -0.38 },
+        { x: 0.35, y: -0.32 }, { x: 0.35, y: -0.44 }, { x: 0.28, y: -0.38 }, { x: 0.42, y: -0.38 }
+    );
+    for (let i = 0; i < 11; i++) {
+        const a = Math.PI * (0.15 + 0.7 * (i / 10));
+        smileyPts.push({ x: Math.cos(a) * 0.55, y: Math.sin(a) * 0.55 });
+    }
+
+    // Diamond outline
+    const diamondVerts = [{ x: 0, y: -1 }, { x: 0.7, y: 0 }, { x: 0, y: 1 }, { x: -0.7, y: 0 }];
+
+    return {
+        'builtin:star': { id: 'builtin:star', name: 'Star', points: polygonOutline(starVerts, 4), builtin: true },
+        'builtin:spiral': { id: 'builtin:spiral', name: 'Spiral', points: spiralPts, builtin: true },
+        'builtin:smiley': { id: 'builtin:smiley', name: 'Smiley', points: smileyPts, builtin: true },
+        'builtin:diamond': { id: 'builtin:diamond', name: 'Diamond', points: polygonOutline(diamondVerts, 8), builtin: true }
+    };
+})();
+
 /**
- * Get a shell by id
+ * Get a shell by id (starter shells or the project library)
  */
 function getShellById(id) {
+    if (id && BUILTIN_SHELLS[id]) return BUILTIN_SHELLS[id];
     return customShells.find(s => s.id === id) || null;
 }
 
@@ -78,10 +177,12 @@ function loadShells(data) {
 }
 
 /**
- * Validate text for a text firework
+ * Validate text for a text firework (charset, length, content)
  */
 function isValidFireworkText(text) {
-    return typeof text === 'string' && TEXT_ALLOWED.test(text.trim());
+    return typeof text === 'string' &&
+           TEXT_ALLOWED.test(text.trim()) &&
+           !containsBlockedWord(text);
 }
 
 /**

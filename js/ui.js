@@ -336,7 +336,7 @@ function saveLaunchEvent() {
     } else if (rawType === 'text') {
         text = document.getElementById('firework-text').value.trim();
         if (!isValidFireworkText(text)) {
-            showToast('Enter 1-14 letters or numbers for your text firework', 'error');
+            showToast(containsBlockedWord(text) ? 'Please choose different words' : 'Enter 1-14 letters or numbers for your text firework', 'error');
             return;
         }
     }
@@ -394,7 +394,7 @@ function testFireLaunch() {
     } else if (rawType === 'text') {
         text = document.getElementById('firework-text').value.trim();
         if (!isValidFireworkText(text)) {
-            showToast('Enter 1-14 letters or numbers first', 'error');
+            showToast(containsBlockedWord(text) ? 'Please choose different words' : 'Enter 1-14 letters or numbers first', 'error');
             return;
         }
     }
@@ -428,9 +428,19 @@ function updateTextRowVisibility() {
 }
 
 /**
- * Rebuild the "My Shells" optgroup in the type dropdown
+ * Rebuild the starter and "My Shells" optgroups in the type dropdown
  */
 function updateShellOptions() {
+    const starterGroup = document.getElementById('starter-shells-optgroup');
+    if (starterGroup && starterGroup.children.length === 0) {
+        Object.values(BUILTIN_SHELLS).forEach(shell => {
+            const opt = document.createElement('option');
+            opt.value = 'custom:' + shell.id;
+            opt.textContent = shell.name;
+            starterGroup.appendChild(opt);
+        });
+    }
+
     const group = document.getElementById('my-shells-optgroup');
     if (!group) return;
 
@@ -498,19 +508,37 @@ function closeShellStudio() {
 }
 
 /**
- * Populate the existing-shells dropdown in the studio
+ * Populate the existing-shells dropdown in the studio.
+ * Starter shells load as remixable starting points.
  */
 function refreshShellStudioList() {
     const select = document.getElementById('shell-studio-list');
-    const current = shellEditingId || '';
+    const current = select.value;
     select.innerHTML = '<option value="">New shell...</option>';
-    customShells.forEach(shell => {
+
+    const starters = document.createElement('optgroup');
+    starters.label = 'Starter Shells (remix me!)';
+    Object.values(BUILTIN_SHELLS).forEach(shell => {
         const opt = document.createElement('option');
         opt.value = shell.id;
         opt.textContent = shell.name;
-        select.appendChild(opt);
+        starters.appendChild(opt);
     });
-    select.value = current;
+    select.appendChild(starters);
+
+    if (customShells.length > 0) {
+        const mine = document.createElement('optgroup');
+        mine.label = 'My Shells';
+        customShells.forEach(shell => {
+            const opt = document.createElement('option');
+            opt.value = shell.id;
+            opt.textContent = shell.name;
+            mine.appendChild(opt);
+        });
+        select.appendChild(mine);
+    }
+
+    select.value = shellEditingId || current || '';
 }
 
 /**
@@ -523,8 +551,9 @@ function loadShellIntoStudio(shellId) {
 
     const shell = getShellById(shellId);
     if (shell) {
-        shellEditingId = shell.id;
-        document.getElementById('shell-name').value = shell.name;
+        // Starter shells load as a starting point: saving makes your own copy
+        shellEditingId = shell.builtin ? null : shell.id;
+        document.getElementById('shell-name').value = shell.builtin ? 'My ' + shell.name : shell.name;
         const half = (SHELL_GRID - 1) / 2;
         shell.points.forEach(p => {
             const col = Math.round(p.x * half + half);
@@ -644,6 +673,10 @@ function saveShellFromStudio() {
     if (!name) {
         name = 'My Shell ' + (customShells.length + 1);
     }
+    if (containsBlockedWord(name)) {
+        showToast('Please choose a different name', 'error');
+        return;
+    }
 
     const points = shellGridPoints();
     if (shellEditingId && getShellById(shellEditingId)) {
@@ -654,11 +687,20 @@ function saveShellFromStudio() {
     } else {
         const shell = addCustomShell(name, points);
         shellEditingId = shell.id;
-        showToast(`Shell "${name}" saved! Find it under Firework Type.`, 'success');
+        showToast(`Shell "${name}" saved and selected!`, 'success');
     }
 
     refreshShellStudioList();
     updateShellOptions();
+
+    // Select the saved shell in the launch modal so Test Fire and
+    // Add Launch use the design right away
+    const typeSelect = document.getElementById('firework-type');
+    if (typeSelect) {
+        typeSelect.value = 'custom:' + shellEditingId;
+        updateTextRowVisibility();
+    }
+
     markDirty();
 }
 
@@ -717,7 +759,9 @@ function testFireShellStudio() {
         trail: 'sparkle'
     });
 
+    // Fade the studio AND the launch modal behind it, so the sky is visible
     document.getElementById('shell-studio-modal').classList.add('peek');
+    document.getElementById('launch-modal').classList.add('peek');
 }
 
 /**

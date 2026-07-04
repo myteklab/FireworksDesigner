@@ -10,7 +10,8 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 - Click the sky to add a firework right where you want it
 - Test Fire button to preview a firework design before adding it
 - Timeline-based show choreography with precise timing
-- Draggable timeline markers to retime launches
+- Draggable timeline markers that snap to the music's detected beat (BPM shown by the timeline; hold Alt for free placement)
+- Drag whole finales/movements along the timeline as one block; drag on the ruler to select a time range; Alt+arrows nudge the selection
 - Drag-and-drop launcher positioning (up to 10 launchers)
 - Surprise Me: composes and plays a complete choreographed show (opening, rhythm, echo, pulse, showpiece, grand finale) in one click
 - Finale generator with launch patterns (Sweep, Ping-Pong, Volleys, Random), intensity curves, grand ending barrage, color themes, start time, and firework types

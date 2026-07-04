@@ -24,6 +24,7 @@ const music = {
     gain: null,
     durationMs: 0,
     waveform: null,    // Peak buckets for the timeline
+    beatGrid: null,    // { bpm, offsetMs } detected from the track
     loadSeq: 0
 };
 
@@ -94,6 +95,7 @@ function setMusicTrack(trackId) {
     music.trackId = track ? track.id : null;
     music.durationMs = 0;
     music.waveform = null;
+    music.beatGrid = null;
     const seq = ++music.loadSeq;
 
     // Sync the settings UI
@@ -111,6 +113,7 @@ function setMusicTrack(trackId) {
         if (typeof show !== 'undefined' && show) {
             show.updateDuration();
         }
+        updateBpmBadge();
         drawTimelineWaveform();
         return;
     }
@@ -151,6 +154,8 @@ function setMusicTrack(trackId) {
                 peaks[i] = max;
             }
             music.waveform = peaks;
+            music.beatGrid = detectBeatGrid(decoded);
+            updateBpmBadge();
             drawTimelineWaveform();
         })
         .catch(() => { /* No waveform; playback still works */ });
@@ -232,6 +237,139 @@ function drawTimelineWaveform() {
         const h = Math.max(1, music.waveform[i] * (H - 4));
         ctx2.fillRect(i * barW, mid - h / 2, Math.max(1, barW - 0.3), h);
     }
+
+    // Beat ticks along the song
+    if (music.beatGrid) {
+        const period = 60000 / music.beatGrid.bpm;
+        ctx2.fillStyle = 'rgba(210, 180, 255, 0.28)';
+        for (let t = music.beatGrid.offsetMs; t < music.durationMs; t += period) {
+            const x = (t / show.duration) * canvas.width;
+            ctx2.fillRect(x, 0, 1, H);
+        }
+    }
+}
+
+// ── Beat detection and snapping ─────────────────────────────────────
+
+/**
+ * Estimate a steady beat grid from the decoded audio: an onset-strength
+ * envelope, autocorrelated over 60-180 BPM lags, then phase-fitted.
+ * Returns { bpm, offsetMs } or null when the pulse is too weak (no snap).
+ */
+function detectBeatGrid(decoded) {
+    const data = decoded.getChannelData(0);
+    const sr = decoded.sampleRate;
+    const hop = 1024; // ~23ms at 44.1k
+    const frames = Math.floor(data.length / hop);
+    if (frames < 200) return null;
+
+    // Energy per hop, then positive flux (onset strength)
+    const energy = new Float32Array(frames);
+    for (let i = 0; i < frames; i++) {
+        let sum = 0;
+        const start = i * hop;
+        for (let j = 0; j < hop; j += 4) {
+            const v = data[start + j];
+            sum += v * v;
+        }
+        energy[i] = Math.sqrt(sum / (hop / 4));
+    }
+    const flux = new Float32Array(frames);
+    for (let i = 1; i < frames; i++) {
+        flux[i] = Math.max(0, energy[i] - energy[i - 1]);
+    }
+
+    // Autocorrelate flux over beat-period lags (60-180 BPM)
+    const hopSec = hop / sr;
+    const minLag = Math.floor((60 / 180) / hopSec);
+    const maxLag = Math.ceil((60 / 60) / hopSec);
+    let bestLag = 0;
+    let bestScore = 0;
+    let totalScore = 0;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+        let score = 0;
+        for (let i = 0; i < frames - lag; i++) {
+            score += flux[i] * flux[i + lag];
+        }
+        totalScore += score;
+        if (score > bestScore) {
+            bestScore = score;
+            bestLag = lag;
+        }
+    }
+    if (!bestLag || bestScore < (totalScore / (maxLag - minLag + 1)) * 1.15) {
+        return null; // No confident pulse
+    }
+
+    // Octave correction: autocorrelation often lands on the half tempo
+    // (a 120 BPM march reads as 60). Prefer the faster grid when its
+    // correlation holds up.
+    const half = Math.round(bestLag / 2);
+    if (half >= minLag) {
+        let halfScore = 0;
+        for (let i = 0; i < frames - half; i++) {
+            halfScore += flux[i] * flux[i + half];
+        }
+        if (halfScore >= bestScore * 0.55) {
+            bestLag = half;
+            bestScore = halfScore;
+        }
+    }
+
+    // Refine phase: offset (in frames) maximizing flux summed on the grid
+    let bestOffset = 0;
+    let bestPhaseScore = -1;
+    for (let off = 0; off < bestLag; off++) {
+        let score = 0;
+        for (let i = off; i < frames; i += bestLag) {
+            score += flux[i];
+        }
+        if (score > bestPhaseScore) {
+            bestPhaseScore = score;
+            bestOffset = off;
+        }
+    }
+
+    const periodMs = bestLag * hopSec * 1000;
+    return {
+        bpm: Math.round((60000 / periodMs) * 10) / 10,
+        offsetMs: bestOffset * hopSec * 1000
+    };
+}
+
+/**
+ * Snap a show time (ms) to the nearest beat when a grid exists and the
+ * time is within the song and threshold. Returns the possibly-adjusted time.
+ */
+function snapToBeat(ms, thresholdMs = 90) {
+    if (!music.beatGrid || !music.durationMs || ms > music.durationMs) return ms;
+    const period = 60000 / music.beatGrid.bpm;
+    const n = Math.round((ms - music.beatGrid.offsetMs) / period);
+    const beat = music.beatGrid.offsetMs + n * period;
+    if (beat >= 0 && Math.abs(beat - ms) <= thresholdMs) {
+        return Math.round(beat);
+    }
+    return ms;
+}
+
+/**
+ * Show the detected tempo next to the timeline
+ */
+function updateBpmBadge() {
+    let badge = document.getElementById('beat-bpm-badge');
+    if (!music.beatGrid) {
+        if (badge) badge.remove();
+        return;
+    }
+    if (!badge) {
+        const container = document.querySelector('.timeline-container');
+        if (!container) return;
+        badge = document.createElement('span');
+        badge.id = 'beat-bpm-badge';
+        container.appendChild(badge);
+    }
+    badge.textContent = '\u2669 ' + Math.round(music.beatGrid.bpm) + ' BPM';
+    badge.title = 'Beat detected: launches snap to the beat when dragged';
 }
 
 // ── Serialization ───────────────────────────────────────────────────

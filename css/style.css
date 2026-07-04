@@ -647,12 +647,15 @@ body {
     background: rgba(0, 0, 0, 0.35);
     border-top: 1px solid #2d2d4a;
     padding: 8px 16px 12px;
+    position: relative;
 }
 
 .timeline-ruler {
     position: relative;
     height: 14px;
     margin-bottom: 4px;
+    cursor: crosshair;
+    touch-action: none;
 }
 
 .time-mark {
@@ -739,6 +742,53 @@ body {
     box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
     cursor: grab;
     touch-action: none;
+    z-index: 2; /* Above group bands so markers stay individually draggable */
+}
+
+/* Group band: draggable block spanning a movement/finale */
+.group-band {
+    position: absolute;
+    top: 1px;
+    height: 7px;
+    background: rgba(155, 89, 182, 0.35);
+    border: 1px solid rgba(155, 89, 182, 0.55);
+    border-radius: 4px;
+    cursor: grab;
+    touch-action: none;
+    z-index: 2;
+}
+
+.group-band:hover {
+    background: rgba(155, 89, 182, 0.26);
+}
+
+/* Range selection box while dragging on the empty track */
+.range-select-box {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(120, 170, 255, 0.18);
+    border: 1px solid rgba(120, 170, 255, 0.5);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 4;
+}
+
+/* Selected launches ring white on the timeline */
+.event-marker.selected {
+    border-color: #fff;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+
+/* Detected tempo badge */
+#beat-bpm-badge {
+    position: absolute;
+    top: 8px;
+    right: 16px;
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    color: #9b8ab8;
+    pointer-events: none;
 }
 
 /* Widen the marker grab area without changing its look */
@@ -750,7 +800,7 @@ body {
 
 .event-marker:hover {
     border-color: #fff;
-    z-index: 2;
+    z-index: 3;
 }
 
 /* Modal Overlay */

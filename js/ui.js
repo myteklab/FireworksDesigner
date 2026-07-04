@@ -40,6 +40,9 @@ function initUI() {
     // Playhead dragging
     setupPlayheadDrag();
 
+    // Drag on empty track = select a time range
+    initTimelineRangeSelect();
+
     // Note: Launcher selection buttons in modal are created dynamically
     // See updateLauncherSelectButtons() in engine.js
 
@@ -91,12 +94,16 @@ function handleKeyboard(e) {
         return;
     }
 
-    // Arrow keys to nudge the playhead (Shift for bigger steps)
+    // Alt+Arrow nudges the selected launches; plain arrows scrub the playhead
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
         e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
         e.preventDefault();
-        const step = (e.shiftKey ? 5000 : 1000) * (e.key === 'ArrowLeft' ? -1 : 1);
-        show.seek(show.currentTime + step);
+        const dir = e.key === 'ArrowLeft' ? -1 : 1;
+        if (e.altKey && typeof selectedEventIds !== 'undefined' && selectedEventIds.size > 0) {
+            nudgeSelectedEvents((e.shiftKey ? 1000 : 100) * dir);
+        } else {
+            show.seek(show.currentTime + (e.shiftKey ? 5000 : 1000) * dir);
+        }
         return;
     }
 
@@ -1215,11 +1222,37 @@ function updateTimelineMarkers() {
     // Remove existing markers
     track.querySelectorAll('.event-marker').forEach(m => m.remove());
 
+    // Remove existing group bands
+    track.querySelectorAll('.group-band').forEach(b => b.remove());
+
+    // Group bands: one draggable block per finale/movement
+    const bands = {};
+    show.events.forEach(event => {
+        if (!event.group) return;
+        if (!bands[event.group]) {
+            bands[event.group] = { label: event.groupLabel || 'Group', min: event.time, max: event.time };
+        } else {
+            bands[event.group].min = Math.min(bands[event.group].min, event.time);
+            bands[event.group].max = Math.max(bands[event.group].max, event.time);
+        }
+    });
+    Object.entries(bands).forEach(([groupId, b]) => {
+        const band = document.createElement('div');
+        band.className = 'group-band';
+        band.style.left = ((b.min / show.duration) * 100) + '%';
+        band.style.width = (Math.max(0.5, ((b.max - b.min) / show.duration) * 100)) + '%';
+        band.title = b.label + ': drag to move the whole group';
+        band.dataset.groupId = groupId;
+        band.addEventListener('pointerdown', onGroupBandPointerDown);
+        track.appendChild(band);
+    });
+
     // Add new markers
     show.events.forEach(event => {
         const percentage = (event.time / show.duration) * 100;
         const marker = document.createElement('div');
-        marker.className = 'event-marker';
+        const selected = typeof isEventSelected === 'function' && isEventSelected(event.id);
+        marker.className = 'event-marker' + (selected ? ' selected' : '');
         marker.style.left = percentage + '%';
         marker.style.backgroundColor = event.primaryColor;
         marker.title = `${formatTimeDetailed(event.time)} - ${eventTypeName(event)} (drag to move)`;
@@ -1277,8 +1310,12 @@ function onMarkerPointerMove(e) {
         markerDrag.moved = true;
     }
 
-    // Snap to tenths of a second
+    // Snap to tenths of a second, then magnetically to the music's beat
+    // (hold Alt for free placement)
     markerDrag.newTime = Math.round(Math.max(0, Math.min(markerDrag.startTime + deltaMs, show.duration)) / 100) * 100;
+    if (!e.altKey && typeof snapToBeat === 'function') {
+        markerDrag.newTime = snapToBeat(markerDrag.newTime, 110);
+    }
     markerDrag.marker.style.left = ((markerDrag.newTime / show.duration) * 100) + '%';
     markerDrag.marker.title = formatTimeDetailed(markerDrag.newTime);
 }
@@ -1303,6 +1340,179 @@ function onMarkerPointerUp(e) {
         markDirty();
         showToast('Moved to ' + formatTimeDetailed(drag.newTime), 'success');
     }
+}
+
+// Group band drag state
+let bandDrag = null;
+
+/**
+ * Drag a whole group (finale/movement) along the timeline
+ */
+function onGroupBandPointerDown(e) {
+    const band = e.currentTarget;
+    const groupId = band.dataset.groupId;
+    const members = show.events.filter(ev => ev.group === groupId);
+    if (members.length === 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    band.setPointerCapture(e.pointerId);
+
+    bandDrag = {
+        band: band,
+        groupId: groupId,
+        startClientX: e.clientX,
+        startMin: Math.min(...members.map(ev => ev.time)),
+        delta: 0,
+        moved: false
+    };
+
+    band.addEventListener('pointermove', onGroupBandPointerMove);
+    band.addEventListener('pointerup', onGroupBandPointerUp);
+    band.addEventListener('pointercancel', onGroupBandPointerUp);
+}
+
+function onGroupBandPointerMove(e) {
+    if (!bandDrag) return;
+
+    const track = document.getElementById('timeline-track');
+    const rect = track.getBoundingClientRect();
+    let deltaMs = ((e.clientX - bandDrag.startClientX) / rect.width) * show.duration;
+
+    if (Math.abs(e.clientX - bandDrag.startClientX) > 3) {
+        bandDrag.moved = true;
+    }
+
+    // The block start cannot go below zero; snap it to the beat
+    let newStart = Math.max(0, bandDrag.startMin + deltaMs);
+    newStart = Math.round(newStart / 100) * 100;
+    if (!e.altKey && typeof snapToBeat === 'function') {
+        newStart = snapToBeat(newStart, 110);
+    }
+    bandDrag.delta = newStart - bandDrag.startMin;
+    bandDrag.band.style.left = ((newStart / show.duration) * 100) + '%';
+    bandDrag.band.title = formatTimeDetailed(newStart);
+}
+
+function onGroupBandPointerUp(e) {
+    if (!bandDrag) return;
+
+    const drag = bandDrag;
+    bandDrag = null;
+
+    drag.band.removeEventListener('pointermove', onGroupBandPointerMove);
+    drag.band.removeEventListener('pointerup', onGroupBandPointerUp);
+    drag.band.removeEventListener('pointercancel', onGroupBandPointerUp);
+
+    if (drag.moved && drag.delta !== 0) {
+        suppressTrackClick = true;
+
+        if (typeof saveState === 'function') saveState('Move Group');
+        show.events.forEach(ev => {
+            if (ev.group === drag.groupId) {
+                ev.time = Math.max(0, ev.time + drag.delta);
+                ev.triggered = false;
+            }
+        });
+        show.sortEvents();
+        show.updateDuration();
+        refreshEventList();
+        markDirty();
+        showToast('Group moved to ' + formatTimeDetailed(drag.startMin + drag.delta), 'success');
+    }
+}
+
+// Range selection on the timeline track
+let rangeSelect = null;
+
+function initTimelineRangeSelect() {
+    const track = document.getElementById('timeline-track');
+    if (!track) return;
+
+    track.addEventListener('pointerdown', (e) => {
+        // Only start on the bare track (markers/bands/playhead handle themselves)
+        if (e.target !== track && e.target.id !== 'timeline-waveform' && e.target.id !== 'timeline-progress') return;
+        rangeSelect = { startClientX: e.clientX, box: null, active: false };
+        track.setPointerCapture(e.pointerId);
+    });
+
+    // The ruler row works too: in dense shows the markers' grab areas can
+    // tile the whole track, so the ruler is the reliable place to drag
+    const ruler = document.querySelector('.timeline-ruler');
+    if (ruler) {
+        ruler.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            rangeSelect = { startClientX: e.clientX, box: null, active: false, fromRuler: true };
+            ruler.setPointerCapture(e.pointerId);
+        });
+        ruler.addEventListener('pointermove', (e) => trackRangeMove(e, track));
+        ruler.addEventListener('pointerup', (e) => finishRangeSelect(e, track));
+        ruler.addEventListener('pointercancel', (e) => finishRangeSelect(e, track));
+    }
+
+    track.addEventListener('pointermove', (e) => trackRangeMove(e, track));
+    track.addEventListener('pointerup', (e) => finishRangeSelect(e, track));
+    track.addEventListener('pointercancel', (e) => finishRangeSelect(e, track));
+}
+
+function trackRangeMove(e, track) {
+    if (!rangeSelect) return;
+    const moved = Math.abs(e.clientX - rangeSelect.startClientX);
+    if (!rangeSelect.active && moved > 6) {
+        rangeSelect.active = true;
+        rangeSelect.box = document.createElement('div');
+        rangeSelect.box.className = 'range-select-box';
+        track.appendChild(rangeSelect.box);
+    }
+    if (rangeSelect.active) {
+        const rect = track.getBoundingClientRect();
+        const x1 = Math.max(0, Math.min(rangeSelect.startClientX, e.clientX) - rect.left);
+        const x2 = Math.min(rect.width, Math.max(rangeSelect.startClientX, e.clientX) - rect.left);
+        rangeSelect.box.style.left = x1 + 'px';
+        rangeSelect.box.style.width = (x2 - x1) + 'px';
+    }
+}
+
+function finishRangeSelect(e, track) {
+    if (!rangeSelect) return;
+    const sel = rangeSelect;
+    rangeSelect = null;
+
+    if (!sel.active) return; // A plain click: let the seek handler run
+
+    suppressTrackClick = true;
+    const rect = track.getBoundingClientRect();
+    const t1 = (Math.max(0, Math.min(sel.startClientX, e.clientX) - rect.left) / rect.width) * show.duration;
+    const t2 = (Math.min(rect.width, Math.max(sel.startClientX, e.clientX) - rect.left) / rect.width) * show.duration;
+    if (sel.box) sel.box.remove();
+
+    if (typeof selectedEventIds !== 'undefined') {
+        selectedEventIds.clear();
+        show.events.forEach(ev => {
+            if (ev.time >= t1 && ev.time <= t2) selectedEventIds.add(ev.id);
+        });
+        refreshEventList();
+        const n = selectedEventIds.size;
+        showToast(n === 0 ? 'No launches in that range' : n + ' launch' + (n > 1 ? 'es' : '') + ' selected (Alt+arrows to nudge)', 'info');
+    }
+}
+
+/**
+ * Shift all selected events in time (Alt+Arrow keys)
+ */
+function nudgeSelectedEvents(deltaMs) {
+    const selected = typeof getSelectedEvents === 'function' ? getSelectedEvents() : [];
+    if (selected.length === 0) return;
+
+    if (typeof saveState === 'function') saveState('Nudge Events');
+    selected.forEach(ev => {
+        ev.time = Math.max(0, ev.time + deltaMs);
+        ev.triggered = false;
+    });
+    show.sortEvents();
+    show.updateDuration();
+    refreshEventList();
+    markDirty();
 }
 
 /**

@@ -80,12 +80,8 @@ function resumeAudioContext() {
  * Try to load MP3 sound files
  */
 function tryLoadSoundFiles() {
-    // For now, use synthetic sounds
-    // MP3 files can be added later for higher quality
-    useSynthetic = true;
-
-    // Uncomment below to enable MP3 loading:
-    /*
+    // Real recorded samples (CC0, see assets/sounds/CREDITS.md) with the
+    // synthetic engine as fallback if they fail to load.
     const testFile = SOUND_FILES.boom1;
     fetch(testFile, { method: 'HEAD' })
         .then(response => {
@@ -97,7 +93,6 @@ function tryLoadSoundFiles() {
         .catch(() => {
             useSynthetic = true;
         });
-    */
 }
 
 /**
@@ -507,18 +502,21 @@ function createCheerSound(startTime, volume) {
  * NOTE: Synthetic crowd sounds disabled - requires real audio files
  */
 function playCrowdAmbience() {
+    if (window.PREVIEW_MUTED) return;
     if (!audio.enabled || !audio.crowdEnabled || !audioContext) return;
     if (crowdSource) return; // Already playing
 
     // Only play if we have real audio files loaded
-    if (useSynthetic) {
-        // Synthetic crowd sounds are disabled - they sound too artificial
-        // To enable: add crowd-murmur.mp3 to assets/sounds/
-        return;
-    }
+    if (useSynthetic) return;
 
-    // Real audio file playback would go here
-    // playBufferedSound('crowdMurmur', 0.3);
+    const buffer = soundCache.crowdMurmur;
+    if (!buffer) return;
+
+    crowdSource = audioContext.createBufferSource();
+    crowdSource.buffer = buffer;
+    crowdSource.loop = true;
+    crowdSource.connect(crowdGain);
+    crowdSource.start(0);
 }
 
 /**
@@ -540,16 +538,22 @@ function stopCrowdAmbience() {
  * NOTE: Synthetic crowd sounds disabled - requires real audio files
  * @param {string} size - Firework size (small, medium, large)
  */
+let lastCheerAt = 0;
+
 function triggerCrowdCheer(size) {
     if (window.PREVIEW_MUTED) return; // Silent during offscreen preview renders
     if (!audio.enabled || !audio.crowdEnabled) return;
 
     // Only play if we have real audio files loaded
-    if (useSynthetic) {
-        // Synthetic crowd sounds are disabled - they sound too artificial
-        // To enable: add crowd-cheer.mp3 to assets/sounds/
-        return;
-    }
+    if (useSynthetic) return;
+
+    // Throttle: crowds react to moments, not to every shell. During a
+    // finale dozens of bursts land per second; without this they stack.
+    const now = Date.now();
+    if (now - lastCheerAt < 3500) return;
+    if (size === 'small' && Math.random() < 0.6) return;
+    if (size === 'medium' && Math.random() < 0.3) return;
+    lastCheerAt = now;
 
     let intensity;
     switch(size) {

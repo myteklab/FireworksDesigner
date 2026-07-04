@@ -18,7 +18,7 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 - Scenery backdrops (City Skyline, Mountains, Forest, Rooftops) with a lake reflection option that mirrors your fireworks live on the water
 - Real-time canvas rendering with twinkling stars and ground effects
 - Responsive display that scales to the window, with touch support
-- Synthesized sound effects (launch whoosh, burst explosions, crackle)
+- Real recorded firework sound (CC0, see assets/sounds/CREDITS.md): launch whistles, burst booms, crackle, and crowd ambience with cheers, with a synthesized fallback
 - Weather system with wind and smoke effects
 - Undo/redo with full state history
 - Keyboard shortcuts (Space to play/pause, arrow keys to scrub, Ctrl+Z/Y for undo/redo)

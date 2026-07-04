@@ -226,6 +226,7 @@ function testFireFirework(config) {
 function setupLauncherButtons() {
     const addBtn = document.getElementById('btn-add-launcher');
     const removeBtn = document.getElementById('btn-remove-launcher');
+    const distributeBtn = document.getElementById('btn-distribute-launchers');
 
     if (addBtn) {
         addBtn.addEventListener('click', addNewLauncher);
@@ -234,6 +235,20 @@ function setupLauncherButtons() {
     if (removeBtn) {
         removeBtn.addEventListener('click', removeSelectedLauncher);
     }
+
+    if (distributeBtn) {
+        distributeBtn.addEventListener('click', distributeLaunchers);
+    }
+}
+
+/**
+ * Space all launchers evenly across the canvas
+ */
+function distributeLaunchers() {
+    if (typeof saveState === 'function') saveState('Distribute Launchers');
+    launcherManager.distributeEvenly();
+    markDirty();
+    showToast('Launchers evenly spaced', 'success');
 }
 
 /**

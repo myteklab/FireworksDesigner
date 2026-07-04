@@ -272,6 +272,21 @@ class LauncherManager {
     }
 
     /**
+     * Space launchers evenly across the canvas, keeping left-to-right order
+     */
+    distributeEvenly() {
+        const sorted = [...this.launchers].sort((a, b) => a.x - b.x);
+        const spacing = this.canvasWidth / (sorted.length + 1);
+        sorted.forEach((launcher, i) => {
+            launcher.setPosition(spacing * (i + 1));
+        });
+
+        if (this.onLaunchersChanged) {
+            this.onLaunchersChanged();
+        }
+    }
+
+    /**
      * Clear all launchers and reset
      */
     clearLaunchers() {

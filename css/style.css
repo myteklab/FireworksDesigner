@@ -545,6 +545,12 @@ body {
     border-color: #9b59b6;
 }
 
+/* Export button record dot */
+.export-rec-dot {
+    color: #e74c3c;
+    font-size: 11px;
+}
+
 /* Video export recording overlay */
 #export-overlay {
     position: fixed;

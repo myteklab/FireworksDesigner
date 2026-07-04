@@ -211,6 +211,7 @@ function playSound(name, volumeMultiplier = 1.0, spatial = null) {
     let volume = volumeMultiplier;
     let pan = 0;
     let muffleHz = null;
+    let rate = (spatial && spatial.rate) || 1;
     if (spatial) {
         if (typeof spatial.x === 'number') {
             pan = Math.max(-0.6, Math.min(0.6, ((spatial.x - 400) / 400) * 0.75));
@@ -225,14 +226,14 @@ function playSound(name, volumeMultiplier = 1.0, spatial = null) {
     if (useSynthetic) {
         playSyntheticSound(name, volume);
     } else {
-        playBufferedSound(name, volume, pan, muffleHz);
+        playBufferedSound(name, volume, pan, muffleHz, rate);
     }
 }
 
 /**
  * Play a buffered (MP3) sound with optional pan and lowpass muffle
  */
-function playBufferedSound(name, volumeMultiplier, pan = 0, muffleHz = null) {
+function playBufferedSound(name, volumeMultiplier, pan = 0, muffleHz = null, rate = 1) {
     const buffer = soundCache[name];
     if (!buffer) {
         // Fallback to synthetic
@@ -243,6 +244,7 @@ function playBufferedSound(name, volumeMultiplier, pan = 0, muffleHz = null) {
     const source = audioContext.createBufferSource();
     const gain = audioContext.createGain();
     source.buffer = buffer;
+    if (rate !== 1) source.playbackRate.value = rate;
     gain.gain.value = volumeMultiplier;
 
     // source -> [lowpass] -> gain -> [panner] -> master

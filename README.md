@@ -22,7 +22,9 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 - Weather system with wind and smoke effects
 - Undo/redo with full state history
 - Keyboard shortcuts (Space to play/pause, arrow keys to scrub, Ctrl+Z/Y for undo/redo)
-- Video export: record your show (with sound) to a webm video, saved to your Files on the platform
+- Music: six public domain soundtracks (Sousa marches by the U.S. Marine Band, William Tell and 1812 Overture finales) with the waveform shown in the timeline; the show plays to the end of the song and exports include the music
+- Per-firework launch sound (whistle, quiet, or silent) and booms that scale with shell size
+- Video export: record your show (with sound and music) to a webm video, saved to your Files on the platform
 - Save and load projects
 
 ## How to Use

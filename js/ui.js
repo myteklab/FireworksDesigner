@@ -184,6 +184,8 @@ function openAddLaunchModal() {
     document.getElementById('firework-size').value = 'medium';
     document.getElementById('firework-height').value = 'high';
     document.getElementById('firework-trail').value = 'sparkle';
+    const launchSoundSel = document.getElementById('launch-sound');
+    if (launchSoundSel) launchSoundSel.value = 'whistle';
 
     // Reset launcher selection to first available
     const container = document.getElementById('launcher-select');
@@ -279,6 +281,8 @@ function openEditLaunchModal(eventId) {
     document.getElementById('firework-size').value = event.size;
     document.getElementById('firework-height').value = event.height;
     document.getElementById('firework-trail').value = event.trail;
+    const editLaunchSoundSel = document.getElementById('launch-sound');
+    if (editLaunchSoundSel) editLaunchSoundSel.value = event.launchSound || 'whistle';
 
     // Set launcher selection
     const container = document.getElementById('launcher-select');
@@ -355,7 +359,8 @@ function saveLaunchEvent() {
         secondaryColor: document.getElementById('secondary-color').value,
         size: document.getElementById('firework-size').value,
         height: document.getElementById('firework-height').value,
-        trail: document.getElementById('firework-trail').value
+        trail: document.getElementById('firework-trail').value,
+        launchSound: (document.getElementById('launch-sound') || { value: 'whistle' }).value
     };
 
     if (currentEditingEventId) {
@@ -414,7 +419,8 @@ function testFireLaunch() {
         secondaryColor: document.getElementById('secondary-color').value,
         size: document.getElementById('firework-size').value,
         height: document.getElementById('firework-height').value,
-        trail: document.getElementById('firework-trail').value
+        trail: document.getElementById('firework-trail').value,
+        launchSound: (document.getElementById('launch-sound') || { value: 'whistle' }).value
     });
 
     // Fade the modal so the firework is visible behind it
@@ -815,6 +821,7 @@ function duplicateEvent(eventId) {
         type: event.type,
         text: event.text || null,
         shellId: event.shellId || null,
+        launchSound: event.launchSound || 'whistle',
         primaryColor: event.primaryColor,
         secondaryColor: event.secondaryColor,
         size: event.size,
@@ -1223,6 +1230,11 @@ function updateTimelineMarkers() {
 
     // Update timeline ruler
     updateTimelineRuler();
+
+    // Redraw the soundtrack waveform (duration may have changed)
+    if (typeof drawTimelineWaveform === 'function') {
+        drawTimelineWaveform();
+    }
 }
 
 // Marker drag state

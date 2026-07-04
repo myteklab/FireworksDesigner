@@ -32,6 +32,7 @@ function deepCloneState() {
             size: e.size,
             height: e.height,
             trail: e.trail,
+            launchSound: e.launchSound || 'whistle',
             text: e.text || null,
             shellId: e.shellId || null,
             group: e.group || null,
@@ -333,6 +334,7 @@ function copySelectedEvents() {
         size: e.size,
         height: e.height,
         trail: e.trail,
+        launchSound: e.launchSound || 'whistle',
         text: e.text || null,
         shellId: e.shellId || null
     }));
@@ -371,6 +373,7 @@ function pasteEvents() {
             size: e.size,
             height: e.height,
             trail: e.trail,
+            launchSound: e.launchSound || 'whistle',
             text: e.text || null,
             shellId: e.shellId || null
         });
@@ -418,6 +421,7 @@ function duplicateSelectedEvents() {
             size: e.size,
             height: e.height,
             trail: e.trail,
+            launchSound: e.launchSound || 'whistle',
             text: e.text || null,
             shellId: e.shellId || null
         });

@@ -112,6 +112,15 @@
                         <option value="comet">Comet</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Launch Sound</label>
+                    <select id="launch-sound" class="form-select">
+                        <option value="whistle" selected>Whistle - Classic rising screech</option>
+                        <option value="quiet">Quiet - Soft muted whoosh</option>
+                        <option value="none">None - Silent climb</option>
+                    </select>
+                </div>
+
             </div>
             <div class="modal-footer">
                 <button class="btn btn-accent" style="margin-right: auto;" onclick="testFireLaunch()" title="Preview this firework right now">&#127878; Test Fire</button>
@@ -226,6 +235,30 @@
                 </div>
 
                 <!-- Audio Settings -->
+                <!-- Music Settings -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">Music</h3>
+
+                    <div class="settings-row">
+                        <label class="settings-label">Soundtrack</label>
+                        <div class="settings-control">
+                            <select id="music-track" class="settings-select">
+                                <option value="" selected>None</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-row">
+                        <label class="settings-label">Music Volume</label>
+                        <div class="settings-control">
+                            <input type="range" id="music-volume" min="0" max="100" value="70" class="settings-slider">
+                            <span id="music-volume-label" class="settings-value">70%</span>
+                        </div>
+                    </div>
+
+                    <p class="settings-hint">All songs are public domain recordings. The show plays to the end of the song.</p>
+                </div>
+
                 <div class="settings-section">
                     <h3 class="settings-section-title">Audio</h3>
 
@@ -607,6 +640,7 @@
                         <span class="time-mark">0:30</span>
                     </div>
                     <div class="timeline-track" id="timeline-track">
+                        <canvas id="timeline-waveform" width="800" height="28"></canvas>
                         <div class="timeline-progress" id="timeline-progress"></div>
                         <div class="playhead" id="playhead"></div>
                         <!-- Event markers will be added here -->
@@ -665,6 +699,7 @@
     <script src="js/launcher.js"></script>
     <script src="js/show.js"></script>
     <script src="js/audio.js"></script>
+    <script src="js/music.js"></script>
     <script src="js/history.js"></script>
     <script src="js/engine.js"></script>
     <script src="js/ui.js"></script>

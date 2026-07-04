@@ -32,6 +32,7 @@ class Show {
             size: eventData.size || 'medium',
             height: eventData.height || 'high',
             trail: eventData.trail || 'sparkle',
+            launchSound: eventData.launchSound || 'whistle',
             text: eventData.text || null,
             shellId: eventData.shellId || null,
             group: eventData.group || null,
@@ -102,15 +103,17 @@ class Show {
      * Duration = last event time + time for firework to complete (~5 seconds)
      */
     updateDuration() {
-        if (this.events.length === 0) {
-            // No events - set minimal duration
-            this.duration = 5000; // 5 seconds minimum
-            return;
-        }
+        const musicMs = (typeof getMusicDurationMs === 'function') ? getMusicDurationMs() : 0;
 
-        const lastEventTime = Math.max(...this.events.map(e => e.time));
-        // Add 5 seconds buffer for firework to launch, burst, and fade
-        this.duration = lastEventTime + 5000;
+        if (this.events.length === 0) {
+            // No events: minimal duration, or the soundtrack's length
+            this.duration = Math.max(5000, musicMs);
+        } else {
+            const lastEventTime = Math.max(...this.events.map(e => e.time));
+            // 5 seconds buffer for the last firework to launch, burst, and fade;
+            // a soundtrack extends the show to the end of the song
+            this.duration = Math.max(lastEventTime + 5000, musicMs);
+        }
 
         // Update timeline UI if callback exists
         if (this.onTimeUpdate) {
@@ -147,6 +150,7 @@ class Show {
                 size: size,
                 height: height,
                 trail: pick(['sparkle', 'sparkle', 'comet', 'none']),
+                launchSound: pick(['whistle', 'quiet', 'quiet', 'none']),
                 group: group,
                 groupLabel: label
             });
@@ -319,6 +323,7 @@ class Show {
                 size: size,
                 height: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
                 trail: ['none', 'sparkle', 'comet'][Math.floor(Math.random() * 3)],
+                launchSound: ['whistle', 'quiet', 'quiet', 'none'][Math.floor(Math.random() * 4)],
                 group: groupId,
                 groupLabel: 'Finale'
             };
@@ -423,6 +428,7 @@ class Show {
             size: event.size,
             height: event.height,
             trail: event.trail,
+            launchSound: event.launchSound,
             text: event.text,
             shellId: event.shellId
         });
@@ -500,6 +506,11 @@ class Show {
         }
         this.isPlaying = true;
 
+        // Start the soundtrack from the current position
+        if (typeof musicPlay === 'function') {
+            musicPlay(this.currentTime);
+        }
+
         // Start crowd ambience
         if (typeof playCrowdAmbience === 'function') {
             playCrowdAmbience();
@@ -515,6 +526,10 @@ class Show {
      */
     pause() {
         this.isPlaying = false;
+
+        if (typeof musicPause === 'function') {
+            musicPause();
+        }
 
         // Stop crowd ambience
         if (typeof stopCrowdAmbience === 'function') {
@@ -533,6 +548,10 @@ class Show {
         this.isPlaying = false;
         this.currentTime = 0;
         this.activeFireworks = [];
+
+        if (typeof musicStop === 'function') {
+            musicStop();
+        }
 
         // Stop crowd ambience
         if (typeof stopCrowdAmbience === 'function') {
@@ -557,6 +576,11 @@ class Show {
         this.currentTime = 0;
         this.activeFireworks = [];
         this.events.forEach(e => e.triggered = false);
+
+        // Restart the soundtrack when looping
+        if (this.isPlaying && typeof musicPlay === 'function') {
+            musicPlay(0);
+        }
     }
 
     /**
@@ -573,6 +597,10 @@ class Show {
         // Clear active fireworks when seeking
         this.activeFireworks = [];
 
+        if (typeof musicSeek === 'function') {
+            musicSeek(this.currentTime);
+        }
+
         if (this.onTimeUpdate) {
             this.onTimeUpdate(this.currentTime, this.duration);
         }
@@ -583,6 +611,9 @@ class Show {
      */
     setSpeed(speed) {
         this.playbackSpeed = speed;
+        if (typeof musicSetRate === 'function') {
+            musicSetRate(speed);
+        }
     }
 
     /**
@@ -629,6 +660,7 @@ class Show {
                 water: scenerySettings.water,
                 skyBrightness: scenerySettings.skyBrightness
             },
+            music: (typeof getMusicSettings === 'function') ? getMusicSettings() : { track: null, volume: 70 },
             weather: weatherSettings,
             audio: audioSettings,
             launchers: this.launcherManager.toJSON(),
@@ -642,6 +674,7 @@ class Show {
                 size: e.size,
                 height: e.height,
                 trail: e.trail,
+                launchSound: e.launchSound || 'whistle',
                 text: e.text || null,
                 shellId: e.shellId || null,
                 group: e.group || null,
@@ -665,6 +698,11 @@ class Show {
         // Load scenery (backdrop + water)
         if (typeof loadScenerySettings === 'function') {
             loadScenerySettings(data.settings);
+        }
+
+        // Load the soundtrack
+        if (typeof loadMusicSettings === 'function') {
+            loadMusicSettings(data.music);
         }
 
         // Load weather settings if available

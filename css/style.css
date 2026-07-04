@@ -669,6 +669,15 @@ body {
     transform: none;
 }
 
+#timeline-waveform {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    border-radius: 6px;
+}
+
 .timeline-track {
     height: 28px;
     background: rgba(255, 255, 255, 0.06);

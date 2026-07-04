@@ -23,6 +23,7 @@ class Firework {
         this.secondaryColor = config.secondaryColor || '#ffaa00';
         this.size = config.size || 'medium';
         this.trailEffect = config.trail || 'sparkle';
+        this.launchSound = config.launchSound || 'whistle';
 
         // Custom burst points (text and user-designed shells)
         this.shellPoints = null;
@@ -130,9 +131,14 @@ class Firework {
 
         // Check if reached burst height
         if (this.rocket.y <= this.burstY || this.rocket.vy >= 0) {
-            // Play whoosh sound as rocket reaches peak
+            // Launch sound, chosen per firework: a bright whistle, a soft
+            // muted whoosh, or silence
             if (typeof playSound === 'function') {
-                playSound('whoosh', 0.7, { x: this.rocket.x });
+                if (this.launchSound === 'whistle') {
+                    playSound('whoosh', 0.65, { x: this.rocket.x, rate: 0.94 + Math.random() * 0.12 });
+                } else if (this.launchSound === 'quiet') {
+                    playSound('whoosh', 0.22, { x: this.rocket.x, y: 200, rate: 0.8 });
+                }
             }
 
             this.x = this.rocket.x;
@@ -195,11 +201,15 @@ class Firework {
             registerBurstEffects(this.x, this.y, this.primaryColor, this.size);
         }
 
-        // Play boom sound from where the shell actually burst
+        // Boom scaled by shell size: big shells hit louder and deeper,
+        // small ones are lighter cracks
         if (typeof playSound === 'function') {
             const boomVariant = 'boom' + (Math.floor(Math.random() * 3) + 1);
-            const volumeMult = this.size === 'large' ? 1.0 : this.size === 'medium' ? 0.8 : 0.6;
-            playSound(boomVariant, volumeMult, { x: this.x, y: this.y });
+            const volumeMult = this.size === 'large' ? 1.0 : this.size === 'medium' ? 0.62 : 0.35;
+            const boomRate = this.size === 'large' ? 0.86 + Math.random() * 0.08
+                           : this.size === 'medium' ? 0.98 + Math.random() * 0.06
+                           : 1.14 + Math.random() * 0.08;
+            playSound(boomVariant, volumeMult, { x: this.x, y: this.y, rate: boomRate });
 
             // Trigger crowd cheer after burst (with delay for realism).
             // Don't even schedule it during offscreen preview renders, since

@@ -94,6 +94,11 @@ function initEngine() {
         initAudio();
     }
 
+    // Initialize music system (if available)
+    if (typeof initMusic === 'function') {
+        initMusic();
+    }
+
     // Initialize history system (undo/redo, selection, copy/paste)
     if (typeof initHistory === 'function') {
         initHistory();

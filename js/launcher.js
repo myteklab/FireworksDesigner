@@ -12,7 +12,9 @@ class Launcher {
         this.canvasHeight = canvasHeight;
 
         // Animation state
-        this.flash = 0; // Flash when launching
+        this.flash = 0; // Sharp muzzle flash (fast decay)
+        this.glow = 0;  // Lingering afterglow and ground light (slow decay)
+        this.sparks = []; // Ejected sparks from the tube mouth
 
         // Drag state
         this.isDragging = false;
@@ -23,6 +25,22 @@ class Launcher {
      */
     triggerFlash() {
         this.flash = 1;
+        this.glow = 1;
+
+        // Eject a burst of sparks from the tube mouth
+        const mouthY = this.y - 32;
+        const count = 10 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < count; i++) {
+            this.sparks.push({
+                x: this.x + (Math.random() - 0.5) * 8,
+                y: mouthY,
+                vx: (Math.random() - 0.5) * 90,
+                vy: -70 - Math.random() * 140,
+                life: 0,
+                maxLife: 0.3 + Math.random() * 0.4,
+                size: 1 + Math.random() * 1.8
+            });
+        }
     }
 
     /**
@@ -30,10 +48,23 @@ class Launcher {
      * @param {number} dt - Delta time in seconds
      */
     update(dt) {
-        // Decay flash
+        // Sharp flash decays fast (~0.25s), afterglow lingers (~0.7s)
         if (this.flash > 0) {
-            this.flash -= dt * 3;
-            if (this.flash < 0) this.flash = 0;
+            this.flash = Math.max(0, this.flash - dt * 4);
+        }
+        if (this.glow > 0) {
+            this.glow = Math.max(0, this.glow - dt * 1.5);
+        }
+
+        // Sparks fly out with gravity
+        if (this.sparks.length > 0) {
+            this.sparks = this.sparks.filter(s => {
+                s.life += dt;
+                s.vy += 320 * dt;
+                s.x += s.vx * dt;
+                s.y += s.vy * dt;
+                return s.life < s.maxLife;
+            });
         }
     }
 
@@ -48,15 +79,22 @@ class Launcher {
 
         ctx.save();
 
-        // Draw flash effect when launching
-        if (this.flash > 0) {
-            ctx.globalAlpha = this.flash * 0.8;
-            ctx.fillStyle = '#ffcc00';
-            ctx.shadowColor = '#ffaa00';
-            ctx.shadowBlur = 30;
+        // Warm light pool spilling onto the ground while firing
+        if (this.glow > 0) {
+            const g = this.glow * this.glow;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.translate(x, y - 6);
+            ctx.scale(1, 0.4);
+            const pool = ctx.createRadialGradient(0, 0, 0, 0, 0, 95);
+            pool.addColorStop(0, `rgba(255, 175, 80, ${0.4 * g})`);
+            pool.addColorStop(0.45, `rgba(255, 120, 40, ${0.16 * g})`);
+            pool.addColorStop(1, 'rgba(255, 90, 20, 0)');
+            ctx.fillStyle = pool;
             ctx.beginPath();
-            ctx.arc(x, y - 20, 25, 0, Math.PI * 2);
+            ctx.arc(0, 0, 95, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
         }
 
         ctx.globalAlpha = 1;
@@ -91,6 +129,74 @@ class Launcher {
         // Draw base
         ctx.fillStyle = '#444';
         ctx.fillRect(x - 15, y - 5, 30, 10);
+
+        // Muzzle effects sit in front of the tube
+        const mouthY = y - 32;
+
+        // Lingering ember glow inside the tube mouth
+        if (this.glow > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const ember = ctx.createRadialGradient(x, mouthY + 2, 0, x, mouthY + 2, 9);
+            ember.addColorStop(0, `rgba(255, 190, 90, ${0.55 * this.glow})`);
+            ember.addColorStop(1, 'rgba(255, 100, 20, 0)');
+            ctx.fillStyle = ember;
+            ctx.beginPath();
+            ctx.arc(x, mouthY + 2, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Sharp muzzle flash: white-hot core with orange falloff, flickering
+        if (this.flash > 0) {
+            const f = this.flash;
+            const flicker = 0.85 + Math.random() * 0.15;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            const r = (7 + 24 * f) * flicker;
+            const core = ctx.createRadialGradient(x, mouthY, 0, x, mouthY, r);
+            core.addColorStop(0, `rgba(255, 255, 235, ${0.95 * f})`);
+            core.addColorStop(0.3, `rgba(255, 215, 130, ${0.7 * f})`);
+            core.addColorStop(0.65, `rgba(255, 135, 45, ${0.35 * f})`);
+            core.addColorStop(1, 'rgba(255, 80, 0, 0)');
+            ctx.fillStyle = core;
+            ctx.beginPath();
+            ctx.arc(x, mouthY, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Brief vertical flame jet in the first instants of launch
+            if (f > 0.45) {
+                const jetH = (58 * (f - 0.45) / 0.55) * flicker;
+                const jet = ctx.createLinearGradient(x, mouthY, x, mouthY - jetH);
+                jet.addColorStop(0, `rgba(255, 240, 185, ${0.85 * f})`);
+                jet.addColorStop(0.5, `rgba(255, 165, 65, ${0.45 * f})`);
+                jet.addColorStop(1, 'rgba(255, 100, 20, 0)');
+                ctx.fillStyle = jet;
+                ctx.beginPath();
+                ctx.moveTo(x - 5, mouthY);
+                ctx.quadraticCurveTo(x - 2, mouthY - jetH * 0.55, x, mouthY - jetH);
+                ctx.quadraticCurveTo(x + 2, mouthY - jetH * 0.55, x + 5, mouthY);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // Ejected sparks
+        if (this.sparks.length > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            this.sparks.forEach(s => {
+                const t = 1 - s.life / s.maxLife;
+                ctx.globalAlpha = t;
+                ctx.fillStyle = t > 0.55 ? '#ffe9b3' : '#ff9c3f';
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size * t + 0.4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
 
         // Draw launcher number
         ctx.fillStyle = isSelected ? '#9b59b6' : '#888';

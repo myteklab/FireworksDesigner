@@ -433,13 +433,11 @@ function render(timestamp) {
         if (testFireworks.length === 0 && typeof onTestFireworksDone === 'function') {
             onTestFireworksDone();
         }
-        // Launcher flash decay needs updates while the show is stopped
-        if (!show.isPlaying) {
-            launcherManager.update(cappedDt);
-        }
     }
 
-    // Draw launchers
+    // Update and draw launchers (always, so flash/spark effects animate
+    // regardless of playback state)
+    launcherManager.update(cappedDt);
     launcherManager.draw(ctx);
 
     // Continue render loop

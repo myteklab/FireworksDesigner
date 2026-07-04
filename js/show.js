@@ -331,8 +331,8 @@ class Show {
         // Remove completed fireworks
         this.activeFireworks = this.activeFireworks.filter(fw => fw.phase !== 'done');
 
-        // Update launchers
-        this.launcherManager.update(dt);
+        // Note: launchers are updated unconditionally in the engine render
+        // loop so flash/spark effects animate even while paused or stopped
 
         // Check for end of show
         if (this.currentTime >= this.duration) {

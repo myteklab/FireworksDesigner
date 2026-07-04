@@ -97,41 +97,65 @@ function buildCity(rand) {
     return { kind: 'city', buildings: buildings, glow: true };
 }
 
-function buildRidge(rand, amplitudeMin, amplitudeMax) {
-    // A ridge as peaks connected across the width
-    const points = [{ x: -20, y: 0 }];
-    let x = -20;
-    while (x < 820) {
-        x += 60 + rand() * 90;
-        points.push({ x: x, y: amplitudeMin + rand() * (amplitudeMax - amplitudeMin) });
+function buildFractalRidge(rand, ampMin, ampMax, roughness) {
+    // Coarse peaks, then midpoint displacement for a natural rocky line
+    let points = [{ x: -40, y: ampMin * 0.5 }];
+    let x = -40;
+    while (x < 840) {
+        x += 130 + rand() * 130;
+        points.push({ x: x, y: ampMin + rand() * (ampMax - ampMin) });
     }
-    points.push({ x: 840, y: 0 });
+    points.push({ x: 880, y: ampMin * 0.5 });
+
+    for (let iter = 0; iter < 4; iter++) {
+        const next = [points[0]];
+        for (let i = 1; i < points.length; i++) {
+            const a = points[i - 1];
+            const b = points[i];
+            const midY = (a.y + b.y) / 2 + (rand() - 0.5) * (b.x - a.x) * roughness;
+            next.push({ x: (a.x + b.x) / 2, y: Math.max(2, midY) });
+            next.push(b);
+        }
+        points = next;
+    }
     return points;
 }
 
 function buildMountains(rand) {
     return {
         kind: 'mountains',
-        far: buildRidge(rand, 70, 150),
-        near: buildRidge(rand, 25, 85)
+        far: buildFractalRidge(rand, 95, 170, 0.18),
+        mid: buildFractalRidge(rand, 50, 105, 0.26),
+        near: buildFractalRidge(rand, 18, 55, 0.34)
     };
 }
 
 function buildForest(rand) {
-    function treeRow(minH, maxH, avgGap) {
-        const trees = [];
-        let x = -10 + rand() * 20;
-        while (x < 810) {
-            trees.push({ x: x, h: minH + rand() * (maxH - minH), w: 16 + rand() * 12 });
-            x += avgGap * (0.7 + rand() * 0.6);
-        }
-        return trees;
+    // Distant forest: short pines packed so tightly they merge into a mass
+    const mass = [];
+    let x = -10;
+    while (x < 810) {
+        mass.push({ x: x, h: 26 + rand() * 26, w: 15 + rand() * 10, tiers: 3 });
+        x += 5 + rand() * 6;
     }
-    return {
-        kind: 'forest',
-        far: treeRow(35, 60, 30),
-        near: treeRow(55, 95, 46)
-    };
+
+    // Gently rolling ground the near trees stand on
+    const ground = buildFractalRidge(rand, 4, 16, 0.05);
+
+    // Near pines: varied heights, widths, and tier counts, uneven spacing
+    const near = [];
+    x = -10 + rand() * 30;
+    while (x < 810) {
+        near.push({
+            x: x,
+            h: 45 + rand() * 65,
+            w: 16 + rand() * 16,
+            tiers: 2 + Math.floor(rand() * 3)
+        });
+        x += 24 + rand() * 55;
+    }
+
+    return { kind: 'forest', mass: mass, ground: ground, near: near };
 }
 
 function buildRooftops(rand) {
@@ -216,44 +240,68 @@ function drawBackdrop(ctx) {
             ctx.beginPath();
             ctx.moveTo(points[0].x, baseY + 6);
             points.forEach(p => ctx.lineTo(p.x, baseY - p.y));
-            ctx.lineTo(840, baseY + 6);
+            ctx.lineTo(880, baseY + 6);
             ctx.closePath();
             ctx.fill();
         };
-        drawRidge(geo.far, '#101530');
-        drawRidge(geo.near, '#070a18');
+        drawRidge(geo.far, '#161c3d');
+        drawRidge(geo.mid, '#0c1028');
+        drawRidge(geo.near, '#05070f');
     }
 
     if (geo.kind === 'forest') {
-        const drawRow = (trees, color) => {
-            ctx.fillStyle = color;
-            trees.forEach(t => {
-                // A pine as one stepped polygon: tip down zigzag sides + trunk
-                const tiers = 3;
-                ctx.beginPath();
-                ctx.moveTo(t.x, baseY - t.h);
-                for (let i = 1; i <= tiers; i++) {
-                    const y = baseY - t.h + (t.h * 0.82) * (i / tiers);
-                    const half = (t.w / 2) * (i / tiers);
-                    ctx.lineTo(t.x + half, y);
-                    if (i < tiers) ctx.lineTo(t.x + half * 0.4, y);
-                }
-                ctx.lineTo(t.x + 2, baseY - t.h * 0.15);
-                ctx.lineTo(t.x + 2, baseY + 4);
-                ctx.lineTo(t.x - 2, baseY + 4);
-                ctx.lineTo(t.x - 2, baseY - t.h * 0.15);
-                for (let i = tiers; i >= 1; i--) {
-                    const y = baseY - t.h + (t.h * 0.82) * (i / tiers);
-                    const half = (t.w / 2) * (i / tiers);
-                    if (i < tiers) ctx.lineTo(t.x - half * 0.4, y);
-                    ctx.lineTo(t.x - half, y);
-                }
-                ctx.closePath();
-                ctx.fill();
-            });
+        const drawPine = (t, rootY) => {
+            ctx.beginPath();
+            ctx.moveTo(t.x, rootY - t.h);
+            for (let i = 1; i <= t.tiers; i++) {
+                const y = rootY - t.h + (t.h * 0.82) * (i / t.tiers);
+                const half = (t.w / 2) * (i / t.tiers);
+                ctx.lineTo(t.x + half, y);
+                if (i < t.tiers) ctx.lineTo(t.x + half * 0.4, y);
+            }
+            ctx.lineTo(t.x + 2, rootY - t.h * 0.15);
+            ctx.lineTo(t.x + 2, rootY + 4);
+            ctx.lineTo(t.x - 2, rootY + 4);
+            ctx.lineTo(t.x - 2, rootY - t.h * 0.15);
+            for (let i = t.tiers; i >= 1; i--) {
+                const y = rootY - t.h + (t.h * 0.82) * (i / t.tiers);
+                const half = (t.w / 2) * (i / t.tiers);
+                if (i < t.tiers) ctx.lineTo(t.x - half * 0.4, y);
+                ctx.lineTo(t.x - half, y);
+            }
+            ctx.closePath();
+            ctx.fill();
         };
-        drawRow(geo.far, '#0a0e1f');
-        drawRow(geo.near, '#05070f');
+
+        // Height of the rolling ground at a given x
+        const groundAt = (gx) => {
+            const pts = geo.ground;
+            for (let i = 1; i < pts.length; i++) {
+                if (pts[i].x >= gx) {
+                    const a = pts[i - 1];
+                    const b = pts[i];
+                    const t = (gx - a.x) / (b.x - a.x || 1);
+                    return a.y + (b.y - a.y) * t;
+                }
+            }
+            return pts[pts.length - 1].y;
+        };
+
+        // Distant tree mass, merged into one dark band
+        ctx.fillStyle = '#0c1129';
+        geo.mass.forEach(t => drawPine(t, baseY - groundAt(t.x) * 0.4));
+
+        // Rolling ground fill
+        ctx.fillStyle = '#04060d';
+        ctx.beginPath();
+        ctx.moveTo(-10, baseY + 6);
+        geo.ground.forEach(p => ctx.lineTo(p.x, baseY - p.y));
+        ctx.lineTo(880, baseY + 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Near pines rooted on the rolling ground
+        geo.near.forEach(t => drawPine(t, baseY - groundAt(t.x) + 2));
     }
 
     if (geo.kind === 'rooftops') {

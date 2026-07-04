@@ -545,6 +545,38 @@ body {
     border-color: #9b59b6;
 }
 
+/* Video export recording overlay */
+#export-overlay {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: rgba(15, 15, 30, 0.95);
+    border: 1px solid rgba(231, 76, 60, 0.5);
+    border-radius: 20px;
+    font-size: 13px;
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.export-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e74c3c;
+    animation: exportPulse 1.2s ease infinite;
+}
+
+@keyframes exportPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
 /* Grand ending toggle in the finale modal */
 .grand-ending-toggle {
     display: flex;

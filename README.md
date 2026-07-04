@@ -22,6 +22,7 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 - Weather system with wind and smoke effects
 - Undo/redo with full state history
 - Keyboard shortcuts (Space to play/pause, arrow keys to scrub, Ctrl+Z/Y for undo/redo)
+- Video export: record your show (with sound) to a webm video, saved to your Files on the platform
 - Save and load projects
 
 ## How to Use

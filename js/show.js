@@ -119,6 +119,133 @@ class Show {
     }
 
     /**
+     * Compose a complete surprise show: opening, movements with breathing
+     * room between them, a showpiece, and a grand finale. Each movement is
+     * its own collapsible group in the schedule.
+     * @returns {Object} { count, duration }
+     */
+    generateSurpriseShow() {
+        const themes = ['random', 'patriotic', 'golden', 'ocean', 'sunset', 'forest', 'candy'];
+        const theme = themes[Math.floor(Math.random() * themes.length)];
+        const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        const jitter = (ms) => (Math.random() - 0.5) * ms;
+
+        const sorted = [...this.launcherManager.launchers].sort((a, b) => a.x - b.x);
+        const ids = sorted.map(l => l.id);
+        const n = ids.length;
+        const center = ids[Math.floor(n / 2)];
+        const newGroup = () => 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+
+        const shell = (time, launcherId, type, size, height, group, label, palette) => {
+            const p = palette || getThemePalette(theme);
+            this.addEvent({
+                time: Math.max(0, Math.round(time)),
+                launcherId: launcherId,
+                type: type,
+                primaryColor: p.primary,
+                secondaryColor: p.secondary,
+                size: size,
+                height: height,
+                trail: pick(['sparkle', 'sparkle', 'comet', 'none']),
+                group: group,
+                groupLabel: label
+            });
+        };
+
+        let count = 0;
+        let t = 500;
+
+        // ── Opening: attention-getting solo shots ──
+        const opening = newGroup();
+        shell(t, center, 'comet', 'large', 'high', opening, 'Opening');
+        shell(t + 1600, ids[0], 'comet', 'medium', 'high', opening, 'Opening');
+        shell(t + 1600, ids[n - 1], 'comet', 'medium', 'high', opening, 'Opening');
+        shell(t + 3400, center, 'brocade', 'large', 'high', opening, 'Opening');
+        count += 4;
+        t += 6500;
+
+        // ── Rhythm: a steady run across the launchers ──
+        const rhythm = newGroup();
+        const rhythmTypes = pick([
+            ['peony', 'chrysanthemum', 'ring'],
+            ['chrysanthemum', 'crackle', 'peony'],
+            ['ring', 'peony', 'strobe']
+        ]);
+        const pingpong = Math.random() < 0.5;
+        const rhythmShots = 9 + Math.floor(Math.random() * 5);
+        const interval = 950 + Math.random() * 350;
+        for (let i = 0; i < rhythmShots; i++) {
+            let idx;
+            if (pingpong && n > 1) {
+                const cycle = (n - 1) * 2;
+                const pos = i % cycle;
+                idx = pos < n ? pos : cycle - pos;
+            } else {
+                idx = i % n;
+            }
+            shell(t + i * interval + jitter(180), ids[idx], pick(rhythmTypes),
+                  Math.random() < 0.6 ? 'medium' : 'small',
+                  pick(['medium', 'high', 'medium']), rhythm, 'Rhythm');
+            count++;
+        }
+        t += rhythmShots * interval + 2500;
+
+        // ── Echo: call-and-response pairs from the edges ──
+        if (n >= 2 && Math.random() < 0.9) {
+            const echo = newGroup();
+            const echoType = pick(['heart', 'ring', 'crossette', 'fish']);
+            const pairs = 4 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < pairs; i++) {
+                const height = i % 2 === 0 ? 'low' : 'high';
+                const palette = getThemePalette(theme);
+                shell(t + i * 2300, ids[0], echoType, 'medium', height, echo, 'Echo', palette);
+                shell(t + i * 2300 + 650, ids[n - 1], echoType, 'medium', height, echo, 'Echo', palette);
+                count += 2;
+            }
+            t += pairs * 2300 + 2500;
+        }
+
+        // ── Pulse: all launchers fire together, three beats ──
+        if (n >= 3 && Math.random() < 0.8) {
+            const pulse = newGroup();
+            const pulseType = pick(['peony', 'strobe', 'pistil']);
+            for (let beat = 0; beat < 3; beat++) {
+                const palette = getThemePalette(theme);
+                ids.forEach(id => {
+                    shell(t + beat * 2600, id, pulseType, 'small', 'medium', pulse, 'Pulse', palette);
+                    count++;
+                });
+            }
+            t += 3 * 2600 + 2000;
+        }
+
+        // ── Showpiece: one big centerpiece moment ──
+        const showpiece = newGroup();
+        shell(t, center, pick(['pistil', 'heart', 'saturn']), 'large', 'high', showpiece, 'Showpiece');
+        if (n >= 3) {
+            shell(t + 500, ids[Math.max(0, Math.floor(n / 2) - 1)], 'willow', 'medium', 'medium', showpiece, 'Showpiece');
+            shell(t + 500, ids[Math.min(n - 1, Math.floor(n / 2) + 1)], 'willow', 'medium', 'medium', showpiece, 'Showpiece');
+            count += 2;
+        }
+        count++;
+        t += 4500;
+
+        // ── Finale with a grand ending ──
+        const finale = this.addFinaleWithOptions({
+            startTime: t,
+            duration: 11000 + Math.floor(Math.random() * 4000),
+            count: 24 + Math.floor(Math.random() * 10),
+            intensity: 'gradual',
+            pattern: pick(['sweep', 'volley', 'pingpong']),
+            grandEnding: true,
+            theme: theme
+        });
+        count += finale.count;
+
+        return { count: count, duration: this.duration };
+    }
+
+    /**
      * Add a finale sequence (legacy - random settings)
      */
     addFinale(startTime = null) {

@@ -19,6 +19,10 @@ function initUI() {
     // Schedule buttons
     document.getElementById('btn-add-launch').addEventListener('click', openAddLaunchModal);
     document.getElementById('btn-add-finale').addEventListener('click', addFinale);
+    const surpriseBtn = document.getElementById('btn-surprise');
+    if (surpriseBtn) {
+        surpriseBtn.addEventListener('click', surpriseMe);
+    }
     document.getElementById('btn-clear-all').addEventListener('click', clearAllEvents);
 
     // Playback controls
@@ -950,6 +954,38 @@ function generateFinale() {
 }
 
 /**
+ * Surprise Me: compose and play a complete show in one click
+ */
+function surpriseMe() {
+    if (show.events.length > 0 && !confirm('Replace your current show with a surprise show?')) {
+        return;
+    }
+
+    if (typeof saveState === 'function') saveState('Surprise Show');
+
+    show.clearEvents();
+    if (typeof clearSelection === 'function') clearSelection();
+
+    // If the scenery is still at defaults, surprise the venue too
+    if (typeof scenery !== 'undefined' && scenery.backdrop === 'none' && !scenery.water) {
+        loadScenerySettings({
+            backdrop: ['none', 'city', 'mountains', 'forest', 'rooftops'][Math.floor(Math.random() * 5)],
+            water: Math.random() < 0.4,
+            skyBrightness: 35 + Math.floor(Math.random() * 35)
+        });
+    }
+
+    const result = show.generateSurpriseShow();
+
+    refreshEventList();
+    markDirty();
+    showToast(`Surprise! ${result.count} fireworks choreographed. Enjoy the show!`, 'success');
+
+    show.seek(0);
+    show.play();
+}
+
+/**
  * Delete an entire event group (finale)
  */
 function deleteGroup(groupId) {
@@ -1056,7 +1092,7 @@ function refreshEventList() {
         eventList.innerHTML = `
             <div class="empty-state">
                 <p>No fireworks scheduled yet!</p>
-                <p class="hint">Click the sky or "Add Launch" to schedule your first firework.</p>
+                <p class="hint">Click the sky to add a firework, or press &#127922; Surprise Me for an instant show!</p>
             </div>
         `;
         // Still refresh the timeline so stale markers are removed

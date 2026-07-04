@@ -499,7 +499,8 @@ class Show {
                 backgroundColor: '#0a0a1a',
                 showStars: true,
                 backdrop: scenerySettings.backdrop,
-                water: scenerySettings.water
+                water: scenerySettings.water,
+                skyBrightness: scenerySettings.skyBrightness
             },
             weather: weatherSettings,
             audio: audioSettings,

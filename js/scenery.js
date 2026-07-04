@@ -11,8 +11,29 @@ const WATER_DEPTH = 45;        // 455..500 is the water band
 
 const scenery = {
     backdrop: 'none', // 'none' | 'city' | 'mountains' | 'forest' | 'rooftops'
-    water: false
+    water: false,
+    skyBrightness: 50 // 0 = near black, 50 = classic night, 100 = dusk
 };
+
+// Sky color ramp: darkest -> classic night (#0a0a1a) -> blue dusk
+const SKY_DARKEST = [3, 3, 10];
+const SKY_CLASSIC = [10, 10, 26];
+const SKY_DUSK = [38, 44, 84];
+
+function skyColorFor(value) {
+    const t = Math.max(0, Math.min(100, value));
+    const mix = (a, b, k) => Math.round(a + (b - a) * k);
+    const seg = t <= 50 ? [SKY_DARKEST, SKY_CLASSIC, t / 50] : [SKY_CLASSIC, SKY_DUSK, (t - 50) / 50];
+    return 'rgb(' + mix(seg[0][0], seg[1][0], seg[2]) + ',' + mix(seg[0][1], seg[1][1], seg[2]) + ',' + mix(seg[0][2], seg[1][2], seg[2]) + ')';
+}
+
+function setSkyBrightness(value) {
+    scenery.skyBrightness = Math.max(0, Math.min(100, Number(value) || 0));
+    backgroundColor = skyColorFor(scenery.skyBrightness);
+
+    const label = document.getElementById('sky-brightness-label');
+    if (label) label.textContent = scenery.skyBrightness + '%';
+}
 
 // Cached geometry per backdrop, built lazily from a fixed seed
 const backdropCache = {};
@@ -31,18 +52,25 @@ function mulberry32(seed) {
 }
 
 function getScenerySettings() {
-    return { backdrop: scenery.backdrop, water: scenery.water };
+    return {
+        backdrop: scenery.backdrop,
+        water: scenery.water,
+        skyBrightness: scenery.skyBrightness
+    };
 }
 
 function loadScenerySettings(settings) {
     scenery.backdrop = (settings && settings.backdrop) || 'none';
     scenery.water = !!(settings && settings.water);
+    setSkyBrightness(settings && settings.skyBrightness !== undefined ? settings.skyBrightness : 50);
 
     // Sync the settings UI if present
     const select = document.getElementById('backdrop-select');
     if (select) select.value = scenery.backdrop;
     const toggle = document.getElementById('water-enabled');
     if (toggle) toggle.checked = scenery.water;
+    const slider = document.getElementById('sky-brightness');
+    if (slider) slider.value = scenery.skyBrightness;
 }
 
 /**
@@ -61,6 +89,14 @@ function initScenery() {
     if (toggle) {
         toggle.addEventListener('change', function () {
             scenery.water = this.checked;
+            markDirty();
+        });
+    }
+
+    const slider = document.getElementById('sky-brightness');
+    if (slider) {
+        slider.addEventListener('input', function () {
+            setSkyBrightness(this.value);
             markDirty();
         });
     }

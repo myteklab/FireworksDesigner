@@ -529,6 +529,8 @@ function refreshEventList() {
                 <p class="hint">Click the sky or "Add Launch" to schedule your first firework.</p>
             </div>
         `;
+        // Still refresh the timeline so stale markers are removed
+        updateTimelineMarkers();
         return;
     }
 

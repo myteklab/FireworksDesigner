@@ -215,6 +215,40 @@ const FIREWORK_TYPES = {
         customPattern: 'saturn'
     },
 
+    pistil: {
+        name: 'Pistil',
+        description: 'Double burst with a glowing core inside',
+        particleCount: { small: 70, medium: 110, large: 160 },
+        spread: 360,
+        speed: { min: 90, max: 140 },
+        gravity: 35,
+        lifetime: { min: 1.5, max: 2.5 },
+        shape: 'circle',
+        sizeStart: 4,
+        sizeEnd: 1,
+        trailLength: 6,
+        hasSecondaryBurst: false,
+        customPattern: 'pistil'
+    },
+
+    fish: {
+        name: 'Fish',
+        description: 'Wiggling sparks that swim through the sky',
+        particleCount: { small: 15, medium: 25, large: 40 },
+        spread: 360,
+        speed: { min: 50, max: 90 },
+        gravity: 10,
+        lifetime: { min: 2.5, max: 4.0 },
+        shape: 'spark',
+        sizeStart: 4,
+        sizeEnd: 2,
+        trailLength: 12,
+        hasSecondaryBurst: false,
+        wiggle: true,
+        wiggleAmp: 80,
+        wiggleFreq: 9
+    },
+
     spider: {
         name: 'Spider',
         description: 'Long burning legs radiating outward',

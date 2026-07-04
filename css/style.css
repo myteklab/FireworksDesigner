@@ -184,6 +184,7 @@ body {
     border: 1px solid #2d2d4a;
     border-radius: 8px;
     box-shadow: 0 0 40px rgba(100, 100, 255, 0.1);
+    touch-action: none;
 }
 
 /* Schedule Panel */
@@ -452,6 +453,14 @@ body {
     border-radius: 2px;
     cursor: ew-resize;
     box-shadow: 0 0 8px rgba(155, 89, 182, 0.5);
+    touch-action: none;
+}
+
+/* Widen the playhead grab area without changing its look */
+.playhead::after {
+    content: '';
+    position: absolute;
+    inset: -6px -8px;
 }
 
 .playhead::before {
@@ -473,9 +482,36 @@ body {
     height: 8px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.5);
+    cursor: grab;
+    touch-action: none;
+}
+
+/* Widen the marker grab area without changing its look */
+.event-marker::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+}
+
+.event-marker:hover {
+    border-color: #fff;
+    z-index: 2;
 }
 
 /* Modal Overlay */
+/* Peek mode: fade the modal out while a test firework flies */
+.modal-overlay.peek {
+    background: transparent;
+}
+
+.modal-overlay.peek .modal-content {
+    opacity: 0.08;
+}
+
+.modal-overlay .modal-content {
+    transition: opacity 0.4s ease;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;

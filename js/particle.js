@@ -47,6 +47,12 @@ class Particle {
         this.strobe = config.strobe || false;
         this.strobeSpeed = config.strobeSpeed || 15;
         this.strobePhase = Math.random() * Math.PI * 2; // Random phase offset
+
+        // Wiggle effect (swimming motion, used by fish type)
+        this.wiggle = config.wiggle || false;
+        this.wiggleAmp = config.wiggleAmp || 60;
+        this.wiggleFreq = config.wiggleFreq || 8;
+        this.wigglePhase = Math.random() * Math.PI * 2;
     }
 
     /**
@@ -81,6 +87,14 @@ class Particle {
         // Update position
         this.x += this.vx * dt;
         this.y += this.vy * dt;
+
+        // Apply wiggle (swim perpendicular to travel direction)
+        if (this.wiggle) {
+            const speed = Math.hypot(this.vx, this.vy) || 1;
+            const w = Math.sin(this.age * this.wiggleFreq + this.wigglePhase) * this.wiggleAmp;
+            this.x += (-this.vy / speed) * w * dt;
+            this.y += (this.vx / speed) * w * dt;
+        }
 
         // Update rotation
         this.rotation += this.rotationSpeed * dt;

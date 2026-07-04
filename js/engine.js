@@ -8,12 +8,21 @@ let launcherManager, show;
 let lastTime = 0;
 let stars = [];
 
+// Logical coordinate space. All game logic and saved data use these dimensions.
+// The canvas buffer is scaled up to match the display size for crisp rendering.
+const LOGIC_WIDTH = 800;
+const LOGIC_HEIGHT = 500;
+let renderScale = 1;
+
 // Settings
 let showStars = true;
 let backgroundColor = '#0a0a1a';
 
 // Track selected launcher for removal
 let selectedLauncherForRemoval = null;
+
+// Test fireworks (fired from the launch modal, run outside show playback)
+let testFireworks = [];
 
 /**
  * Initialize the engine
@@ -24,8 +33,16 @@ function initEngine() {
     ctx = canvas.getContext('2d');
 
     // Initialize managers
-    launcherManager = new LauncherManager(canvas.width, canvas.height);
+    launcherManager = new LauncherManager(LOGIC_WIDTH, LOGIC_HEIGHT);
     show = new Show(launcherManager);
+
+    // Size canvas to fill the available space
+    fitCanvasToContainer();
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(fitCanvasToContainer).observe(canvas.parentElement);
+    } else {
+        window.addEventListener('resize', fitCanvasToContainer);
+    }
 
     // Set up show callbacks
     show.onTimeUpdate = updateTimeDisplay;
@@ -69,48 +86,97 @@ function initEngine() {
 }
 
 /**
- * Set up canvas mouse events for launcher interaction
+ * Fit the canvas to its container, keeping the 8:5 aspect ratio.
+ * The buffer is scaled by devicePixelRatio (capped) so fireworks stay crisp.
  */
-function setupCanvasMouseEvents() {
-    canvas.addEventListener('mousedown', onCanvasMouseDown);
-    canvas.addEventListener('mousemove', onCanvasMouseMove);
-    canvas.addEventListener('mouseup', onCanvasMouseUp);
-    canvas.addEventListener('mouseleave', onCanvasMouseUp);
+function fitCanvasToContainer() {
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    const pad = 24;
+    const availW = container.clientWidth - pad;
+    const availH = container.clientHeight - pad;
+    if (availW <= 0 || availH <= 0) return;
+
+    const scale = Math.min(availW / LOGIC_WIDTH, availH / LOGIC_HEIGHT);
+    const cssW = Math.max(320, Math.round(LOGIC_WIDTH * scale));
+    const cssH = Math.round(cssW * (LOGIC_HEIGHT / LOGIC_WIDTH));
+
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+
+    // Cap buffer scale at 2x to bound fill cost on large/high-DPI screens
+    const dpr = window.devicePixelRatio || 1;
+    renderScale = Math.min(2, (cssW / LOGIC_WIDTH) * dpr);
+
+    const bufferW = Math.round(LOGIC_WIDTH * renderScale);
+    if (canvas.width !== bufferW) {
+        canvas.width = bufferW;
+        canvas.height = Math.round(LOGIC_HEIGHT * renderScale);
+    }
 }
 
 /**
- * Handle mouse down on canvas
+ * Convert a pointer event to logical canvas coordinates
  */
-function onCanvasMouseDown(e) {
+function getCanvasCoords(e) {
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    return {
+        x: (e.clientX - rect.left) * (LOGIC_WIDTH / rect.width),
+        y: (e.clientY - rect.top) * (LOGIC_HEIGHT / rect.height)
+    };
+}
 
-    // Check if clicking on a launcher
-    const launcher = launcherManager.getLauncherAtPoint(x, y);
+/**
+ * Set up canvas pointer events for launcher dragging and sky clicks.
+ * Pointer events cover both mouse and touch.
+ */
+function setupCanvasMouseEvents() {
+    canvas.addEventListener('pointerdown', onCanvasPointerDown);
+    canvas.addEventListener('pointermove', onCanvasPointerMove);
+    canvas.addEventListener('pointerup', onCanvasPointerUp);
+    canvas.addEventListener('pointercancel', onCanvasPointerUp);
+}
+
+// Pending sky click (waiting to see if it becomes a drag)
+let pendingSkyClick = null;
+
+/**
+ * Handle pointer down on canvas
+ */
+function onCanvasPointerDown(e) {
+    const pos = getCanvasCoords(e);
+
+    // Check if pressing on a launcher
+    const launcher = launcherManager.getLauncherAtPoint(pos.x, pos.y);
     if (launcher) {
         // Save state before moving launcher
         if (typeof saveState === 'function') saveState('Move Launcher');
         launcherManager.startDrag(launcher);
         selectedLauncherForRemoval = launcher;
         canvas.classList.add('dragging');
+        canvas.setPointerCapture(e.pointerId);
         markDirty();
+        return;
+    }
+
+    // Pressing on the sky: remember it, add a launch here on release
+    if (pos.y < LOGIC_HEIGHT - 60) {
+        pendingSkyClick = { x: pos.x, y: pos.y, clientX: e.clientX, clientY: e.clientY };
     }
 }
 
 /**
- * Handle mouse move on canvas
+ * Handle pointer move on canvas
  */
-function onCanvasMouseMove(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+function onCanvasPointerMove(e) {
+    const pos = getCanvasCoords(e);
 
     if (launcherManager.isDragging()) {
-        launcherManager.updateDrag(x);
+        launcherManager.updateDrag(pos.x);
     } else {
         // Update cursor based on hover
-        const launcher = launcherManager.getLauncherAtPoint(x, y);
+        const launcher = launcherManager.getLauncherAtPoint(pos.x, pos.y);
         if (launcher) {
             canvas.classList.add('can-drag');
         } else {
@@ -120,12 +186,37 @@ function onCanvasMouseMove(e) {
 }
 
 /**
- * Handle mouse up on canvas
+ * Handle pointer up on canvas
  */
-function onCanvasMouseUp(e) {
+function onCanvasPointerUp(e) {
     if (launcherManager.isDragging()) {
         launcherManager.endDrag();
         canvas.classList.remove('dragging');
+        pendingSkyClick = null;
+        return;
+    }
+
+    // Sky click: open the Add Launch modal prefilled from the click position,
+    // as long as the pointer didn't move far (that would be a drag, not a click)
+    if (pendingSkyClick) {
+        const moved = Math.hypot(e.clientX - pendingSkyClick.clientX, e.clientY - pendingSkyClick.clientY);
+        if (moved < 8 && typeof openAddLaunchModalAt === 'function') {
+            openAddLaunchModalAt(pendingSkyClick.x, pendingSkyClick.y);
+        }
+        pendingSkyClick = null;
+    }
+}
+
+/**
+ * Fire a one-off test firework immediately (used by the launch modal).
+ * Runs independently of show playback.
+ */
+function testFireFirework(config) {
+    const firework = new Firework(config);
+    testFireworks.push(firework);
+
+    if (config.launcherId) {
+        launcherManager.triggerLaunch(config.launcherId);
     }
 }
 
@@ -255,8 +346,8 @@ function generateStars() {
 
     for (let i = 0; i < starCount; i++) {
         stars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * (canvas.height - 100), // Keep stars above launchers
+            x: Math.random() * LOGIC_WIDTH,
+            y: Math.random() * (LOGIC_HEIGHT - 100), // Keep stars above launchers
             size: Math.random() * 1.5 + 0.5,
             brightness: Math.random(),
             twinkleSpeed: Math.random() * 2 + 1
@@ -290,9 +381,12 @@ function render(timestamp) {
     // Cap delta time to prevent huge jumps
     const cappedDt = Math.min(dt, 0.1);
 
+    // Scale all drawing from logical coordinates to the buffer size
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+
     // Clear canvas
     ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, LOGIC_WIDTH, LOGIC_HEIGHT);
 
     // Draw background stars
     if (showStars) {
@@ -315,6 +409,20 @@ function render(timestamp) {
     // Update and draw show
     show.update(cappedDt);
     show.draw(ctx);
+
+    // Update and draw test fireworks (run even while the show is stopped)
+    if (testFireworks.length > 0) {
+        testFireworks.forEach(fw => fw.update(cappedDt));
+        testFireworks = testFireworks.filter(fw => fw.phase !== 'done');
+        testFireworks.forEach(fw => fw.draw(ctx));
+        if (testFireworks.length === 0 && typeof onTestFireworksDone === 'function') {
+            onTestFireworksDone();
+        }
+        // Launcher flash decay needs updates while the show is stopped
+        if (!show.isPlaying) {
+            launcherManager.update(cappedDt);
+        }
+    }
 
     // Draw launchers
     launcherManager.draw(ctx);
@@ -346,19 +454,19 @@ function drawStars(timestamp) {
  */
 function drawGround() {
     // Gradient for ground
-    const groundGradient = ctx.createLinearGradient(0, canvas.height - 50, 0, canvas.height);
+    const groundGradient = ctx.createLinearGradient(0, LOGIC_HEIGHT - 50, 0, LOGIC_HEIGHT);
     groundGradient.addColorStop(0, 'transparent');
     groundGradient.addColorStop(1, 'rgba(30, 30, 50, 0.8)');
 
     ctx.fillStyle = groundGradient;
-    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+    ctx.fillRect(0, LOGIC_HEIGHT - 50, LOGIC_WIDTH, 50);
 
     // Horizon line
     ctx.strokeStyle = 'rgba(100, 100, 150, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, canvas.height - 45);
-    ctx.lineTo(canvas.width, canvas.height - 45);
+    ctx.moveTo(0, LOGIC_HEIGHT - 45);
+    ctx.lineTo(LOGIC_WIDTH, LOGIC_HEIGHT - 45);
     ctx.stroke();
 }
 
@@ -405,13 +513,16 @@ function formatTime(ms) {
 }
 
 /**
- * Format time in mm:ss.ms format for event list
+ * Format time in m:ss.t format for event list (tenths shown when nonzero)
  */
 function formatTimeDetailed(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
+    const tenthsTotal = Math.round(ms / 100);
+    const tenths = tenthsTotal % 10;
+    const totalSeconds = Math.floor(tenthsTotal / 10);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const base = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return tenths > 0 ? `${base}.${tenths}` : base;
 }
 
 /**

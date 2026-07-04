@@ -88,6 +88,12 @@ function handleKeyboard(e) {
  * Handle timeline click for seeking
  */
 function handleTimelineClick(e) {
+    // Ignore the click that follows a marker drag
+    if (suppressTrackClick) {
+        suppressTrackClick = false;
+        return;
+    }
+
     const track = document.getElementById('timeline-track');
     const rect = track.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -105,12 +111,13 @@ function setupPlayheadDrag() {
     const track = document.getElementById('timeline-track');
     let isDragging = false;
 
-    playhead.addEventListener('mousedown', (e) => {
+    playhead.addEventListener('pointerdown', (e) => {
         isDragging = true;
         e.preventDefault();
+        playhead.setPointerCapture(e.pointerId);
     });
 
-    document.addEventListener('mousemove', (e) => {
+    playhead.addEventListener('pointermove', (e) => {
         if (!isDragging) return;
 
         const rect = track.getBoundingClientRect();
@@ -121,13 +128,13 @@ function setupPlayheadDrag() {
         show.seek(time);
     });
 
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
+    const endDrag = () => { isDragging = false; };
+    playhead.addEventListener('pointerup', endDrag);
+    playhead.addEventListener('pointercancel', endDrag);
 }
 
 /**
- * Open add launch modal
+ * Open add launch modal (time defaults to the current playhead position)
  */
 function openAddLaunchModal() {
     currentEditingEventId = null;
@@ -135,10 +142,11 @@ function openAddLaunchModal() {
     // Update launcher buttons first
     updateLauncherSelectButtons();
 
-    // Reset form
+    // Reset form. Default the launch time to the playhead position.
+    const playheadSeconds = Math.round((show ? show.currentTime : 0) / 1000);
     document.getElementById('launch-modal-title').textContent = 'Add Firework Launch';
-    document.getElementById('launch-time-min').value = 0;
-    document.getElementById('launch-time-sec').value = 0;
+    document.getElementById('launch-time-min').value = Math.floor(playheadSeconds / 60);
+    document.getElementById('launch-time-sec').value = playheadSeconds % 60;
     document.getElementById('firework-type').value = 'chrysanthemum';
     document.getElementById('primary-color').value = '#ff0000';
     document.getElementById('secondary-color').value = '#ffaa00';
@@ -160,6 +168,47 @@ function openAddLaunchModal() {
 
     // Show modal
     document.getElementById('launch-modal').style.display = 'flex';
+}
+
+/**
+ * Open add launch modal prefilled from a click on the canvas sky.
+ * Picks the nearest launcher and maps the click height to a burst height.
+ */
+function openAddLaunchModalAt(x, y) {
+    openAddLaunchModal();
+
+    // Nearest launcher to the click
+    let nearest = null;
+    let nearestDist = Infinity;
+    launcherManager.launchers.forEach(l => {
+        const dist = Math.abs(l.x - x);
+        if (dist < nearestDist) {
+            nearestDist = dist;
+            nearest = l;
+        }
+    });
+
+    if (nearest) {
+        const container = document.getElementById('launcher-select');
+        container.querySelectorAll('.launcher-btn').forEach(b => b.classList.remove('active'));
+        const btn = container.querySelector(`.launcher-btn[data-launcher="${nearest.id}"]`);
+        if (btn) {
+            btn.classList.add('active');
+            selectedLauncherId = nearest.id;
+        }
+    }
+
+    // Map click height to the closest burst height
+    let bestHeight = 'high';
+    let bestDist = Infinity;
+    Object.keys(HEIGHT_CONFIGS).forEach(h => {
+        const dist = Math.abs(HEIGHT_CONFIGS[h].burstY - y);
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestHeight = h;
+        }
+    });
+    document.getElementById('firework-height').value = bestHeight;
 }
 
 /**
@@ -215,7 +264,9 @@ function openEditLaunchModal(eventId) {
  * Close launch modal
  */
 function closeLaunchModal() {
-    document.getElementById('launch-modal').style.display = 'none';
+    const modal = document.getElementById('launch-modal');
+    modal.style.display = 'none';
+    modal.classList.remove('peek');
     currentEditingEventId = null;
 }
 
@@ -255,6 +306,68 @@ function saveLaunchEvent() {
     closeLaunchModal();
     refreshEventList();
     markDirty();
+}
+
+/**
+ * Test fire the firework currently configured in the launch modal.
+ * The modal fades out while the firework flies so you can watch it.
+ */
+function testFireLaunch() {
+    const launcher = launcherManager.getLauncherById(selectedLauncherId) || launcherManager.launchers[0];
+    if (!launcher) return;
+
+    const launchPos = launcher.getLaunchPosition();
+
+    testFireFirework({
+        launchX: launchPos.x,
+        launchY: launchPos.y,
+        launcherId: launcher.id,
+        type: document.getElementById('firework-type').value,
+        primaryColor: document.getElementById('primary-color').value,
+        secondaryColor: document.getElementById('secondary-color').value,
+        size: document.getElementById('firework-size').value,
+        height: document.getElementById('firework-height').value,
+        trail: document.getElementById('firework-trail').value
+    });
+
+    // Fade the modal so the firework is visible behind it
+    document.getElementById('launch-modal').classList.add('peek');
+}
+
+/**
+ * Called by the engine when all test fireworks have finished
+ */
+function onTestFireworksDone() {
+    document.getElementById('launch-modal').classList.remove('peek');
+}
+
+/**
+ * Duplicate a single launch event (1 second later, same design)
+ */
+function duplicateEvent(eventId) {
+    const event = show.events.find(e => e.id === eventId);
+    if (!event) return;
+
+    if (typeof saveState === 'function') saveState('Duplicate Launch');
+
+    const newEvent = show.addEvent({
+        time: event.time + 1000,
+        launcherId: event.launcherId,
+        type: event.type,
+        primaryColor: event.primaryColor,
+        secondaryColor: event.secondaryColor,
+        size: event.size,
+        height: event.height,
+        trail: event.trail
+    });
+
+    if (typeof selectEvent === 'function') {
+        selectEvent(newEvent.id, false);
+    }
+
+    refreshEventList();
+    markDirty();
+    showToast('Firework duplicated (+1s)', 'success');
 }
 
 /**
@@ -413,7 +526,7 @@ function refreshEventList() {
         eventList.innerHTML = `
             <div class="empty-state">
                 <p>No fireworks scheduled yet!</p>
-                <p class="hint">Click "Add Launch" to schedule your first firework.</p>
+                <p class="hint">Click the sky or "Add Launch" to schedule your first firework.</p>
             </div>
         `;
         return;
@@ -434,6 +547,7 @@ function refreshEventList() {
                 <span class="event-type">${typeName}</span>
                 <span class="event-size">(${event.size})</span>
                 <div class="event-actions">
+                    <button class="event-action-btn" onclick="event.stopPropagation(); duplicateEvent('${event.id}')" title="Duplicate (+1s)">&#10697;</button>
                     <button class="event-action-btn" onclick="event.stopPropagation(); openEditLaunchModal('${event.id}')" title="Edit">&#9998;</button>
                     <button class="event-action-btn delete" onclick="event.stopPropagation(); deleteEvent('${event.id}')" title="Delete">&#128465;</button>
                 </div>
@@ -495,12 +609,82 @@ function updateTimelineMarkers() {
         marker.className = 'event-marker';
         marker.style.left = percentage + '%';
         marker.style.backgroundColor = event.primaryColor;
-        marker.title = `${formatTimeDetailed(event.time)} - ${FIREWORK_TYPES[event.type]?.name || event.type}`;
+        marker.title = `${formatTimeDetailed(event.time)} - ${FIREWORK_TYPES[event.type]?.name || event.type} (drag to move)`;
+        marker.dataset.eventId = event.id;
+        marker.addEventListener('pointerdown', onMarkerPointerDown);
         track.appendChild(marker);
     });
 
     // Update timeline ruler
     updateTimelineRuler();
+}
+
+// Marker drag state
+let markerDrag = null;
+let suppressTrackClick = false;
+
+/**
+ * Start dragging a timeline event marker to retime it
+ */
+function onMarkerPointerDown(e) {
+    const marker = e.currentTarget;
+    const event = show.events.find(ev => ev.id === marker.dataset.eventId);
+    if (!event) return;
+
+    e.preventDefault();
+    marker.setPointerCapture(e.pointerId);
+
+    markerDrag = {
+        marker: marker,
+        eventId: event.id,
+        startClientX: e.clientX,
+        startTime: event.time,
+        newTime: event.time,
+        moved: false
+    };
+
+    marker.addEventListener('pointermove', onMarkerPointerMove);
+    marker.addEventListener('pointerup', onMarkerPointerUp);
+    marker.addEventListener('pointercancel', onMarkerPointerUp);
+}
+
+function onMarkerPointerMove(e) {
+    if (!markerDrag) return;
+
+    const track = document.getElementById('timeline-track');
+    const rect = track.getBoundingClientRect();
+    const deltaMs = ((e.clientX - markerDrag.startClientX) / rect.width) * show.duration;
+
+    if (Math.abs(e.clientX - markerDrag.startClientX) > 3) {
+        markerDrag.moved = true;
+    }
+
+    // Snap to tenths of a second
+    markerDrag.newTime = Math.round(Math.max(0, Math.min(markerDrag.startTime + deltaMs, show.duration)) / 100) * 100;
+    markerDrag.marker.style.left = ((markerDrag.newTime / show.duration) * 100) + '%';
+    markerDrag.marker.title = formatTimeDetailed(markerDrag.newTime);
+}
+
+function onMarkerPointerUp(e) {
+    if (!markerDrag) return;
+
+    const drag = markerDrag;
+    markerDrag = null;
+
+    drag.marker.removeEventListener('pointermove', onMarkerPointerMove);
+    drag.marker.removeEventListener('pointerup', onMarkerPointerUp);
+    drag.marker.removeEventListener('pointercancel', onMarkerPointerUp);
+
+    if (drag.moved && drag.newTime !== drag.startTime) {
+        // Swallow the click the track would otherwise receive after this drag
+        suppressTrackClick = true;
+
+        if (typeof saveState === 'function') saveState('Move Launch');
+        show.updateEvent(drag.eventId, { time: drag.newTime });
+        refreshEventList();
+        markDirty();
+        showToast('Moved to ' + formatTimeDetailed(drag.newTime), 'success');
+    }
 }
 
 /**

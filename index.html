@@ -55,6 +55,8 @@
                             <option value="waterfall">Waterfall - Cascading sparks</option>
                             <option value="saturn">Saturn - Ring around burst</option>
                             <option value="spider">Spider - Long burning legs</option>
+                            <option value="pistil">Pistil - Double burst with glowing core</option>
+                            <option value="fish">Fish - Wiggling sparks that swim</option>
                         </optgroup>
                     </select>
                 </div>
@@ -99,6 +101,7 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button class="btn btn-accent" style="margin-right: auto;" onclick="testFireLaunch()" title="Preview this firework right now">&#127878; Test Fire</button>
                 <button class="btn btn-secondary" onclick="closeLaunchModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveLaunchEvent()">Add Launch</button>
             </div>
@@ -382,6 +385,14 @@
                             <input type="checkbox" value="spider" checked>
                             <span>Spider</span>
                         </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="pistil" checked>
+                            <span>Pistil</span>
+                        </label>
+                        <label class="type-checkbox">
+                            <input type="checkbox" value="fish" checked>
+                            <span>Fish</span>
+                        </label>
                     </div>
                     <button class="btn btn-secondary btn-xs" onclick="toggleAllTypes(true)">Select All</button>
                     <button class="btn btn-secondary btn-xs" onclick="toggleAllTypes(false)">Deselect All</button>
@@ -462,7 +473,7 @@
                     <!-- Events will be populated here -->
                     <div class="empty-state">
                         <p>No fireworks scheduled yet!</p>
-                        <p class="hint">Click "Add Launch" to schedule your first firework.</p>
+                        <p class="hint">Click the sky or "Add Launch" to schedule your first firework.</p>
                     </div>
                 </div>
 

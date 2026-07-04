@@ -213,6 +213,12 @@ class Firework {
             return;
         }
 
+        // Special handling for pistil (outer shell + inner core)
+        if (this.typeConfig.customPattern === 'pistil') {
+            this.createPistilPattern(particleCount, sizeMultiplier, trailConfig);
+            return;
+        }
+
         // Create particles in burst pattern
         for (let i = 0; i < particleCount; i++) {
             const particle = this.createBurstParticle(i, particleCount, sizeMultiplier, trailConfig);
@@ -280,8 +286,65 @@ class Firework {
             trailLength: trailLength,
             twinkle: config.twinkle || false,
             strobe: config.strobe || false,
-            strobeSpeed: config.strobeSpeed || 15
+            strobeSpeed: config.strobeSpeed || 15,
+            wiggle: config.wiggle || false,
+            wiggleAmp: config.wiggleAmp,
+            wiggleFreq: config.wiggleFreq
         });
+    }
+
+    /**
+     * Create pistil pattern (outer shell in primary color + slow inner core in secondary)
+     */
+    createPistilPattern(particleCount, sizeMultiplier, trailConfig) {
+        const config = this.typeConfig;
+        const outerCount = Math.floor(particleCount * 0.65);
+        const coreCount = particleCount - outerCount;
+
+        for (let i = 0; i < outerCount; i++) {
+            const angle = (i / outerCount) * Math.PI * 2;
+            const speed = (config.speed.min + Math.random() * (config.speed.max - config.speed.min)) * sizeMultiplier.speed;
+            const lifetime = config.lifetime.min + Math.random() * (config.lifetime.max - config.lifetime.min);
+            const trailLength = Math.floor(config.trailLength * (trailConfig.trailMultiplier || 1));
+
+            this.particles.push(new Particle({
+                x: this.x,
+                y: this.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                gravity: config.gravity,
+                lifetime: lifetime,
+                colorStart: this.primaryColor,
+                colorEnd: this.primaryColor,
+                sizeStart: config.sizeStart * sizeMultiplier.spread,
+                sizeEnd: config.sizeEnd,
+                shape: config.shape,
+                trailLength: trailLength
+            }));
+        }
+
+        // Inner core: slower, brighter, secondary color, slightly longer lived
+        for (let i = 0; i < coreCount; i++) {
+            const angle = (i / coreCount) * Math.PI * 2;
+            const speed = (config.speed.min * 0.35 + Math.random() * config.speed.min * 0.15) * sizeMultiplier.speed;
+            const lifetime = config.lifetime.min + 0.4 + Math.random() * (config.lifetime.max - config.lifetime.min);
+
+            this.particles.push(new Particle({
+                x: this.x,
+                y: this.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                gravity: config.gravity * 0.6,
+                lifetime: lifetime,
+                colorStart: '#ffffff',
+                colorEnd: this.secondaryColor,
+                sizeStart: config.sizeStart * sizeMultiplier.spread * 1.2,
+                sizeEnd: config.sizeEnd,
+                shape: 'circle',
+                trailLength: 0,
+                twinkle: true
+            }));
+        }
     }
 
     /**

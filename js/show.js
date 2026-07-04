@@ -32,6 +32,8 @@ class Show {
             size: eventData.size || 'medium',
             height: eventData.height || 'high',
             trail: eventData.trail || 'sparkle',
+            text: eventData.text || null,
+            shellId: eventData.shellId || null,
             group: eventData.group || null,
             groupLabel: eventData.groupLabel || null,
             triggered: false
@@ -157,7 +159,7 @@ class Show {
         const grandEnding = options.grandEnding !== false;
         const theme = options.theme || 'random';
         const customColors = options.customColors || [];
-        const allowedTypes = options.types || Object.keys(FIREWORK_TYPES).filter(t => t !== 'comet');
+        const allowedTypes = options.types || Object.keys(FIREWORK_TYPES).filter(t => !SPECIAL_TYPES.includes(t));
         const groupId = 'grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 
         // Launchers sorted left-to-right so sweep patterns move across the sky
@@ -293,7 +295,9 @@ class Show {
             secondaryColor: event.secondaryColor,
             size: event.size,
             height: event.height,
-            trail: event.trail
+            trail: event.trail,
+            text: event.text,
+            shellId: event.shellId
         });
 
         this.activeFireworks.push(firework);
@@ -504,9 +508,12 @@ class Show {
                 size: e.size,
                 height: e.height,
                 trail: e.trail,
+                text: e.text || null,
+                shellId: e.shellId || null,
                 group: e.group || null,
                 groupLabel: e.groupLabel || null
-            }))
+            })),
+            customShells: (typeof serializeShells === 'function') ? serializeShells() : []
         };
     }
 
@@ -534,6 +541,11 @@ class Show {
         // Load launchers
         if (data.launchers) {
             this.launcherManager.loadFromData(data.launchers);
+        }
+
+        // Load custom shells (before events, which may reference them)
+        if (typeof loadShells === 'function') {
+            loadShells(data.customShells);
         }
 
         // Load events

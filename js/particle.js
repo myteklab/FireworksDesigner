@@ -53,6 +53,10 @@ class Particle {
         this.wiggleAmp = config.wiggleAmp || 60;
         this.wiggleFreq = config.wiggleFreq || 8;
         this.wigglePhase = Math.random() * Math.PI * 2;
+
+        // Fade hold: fraction of lifetime at full opacity before fading.
+        // Used by text/shell patterns so the shape stays legible.
+        this.fadeHold = config.fadeHold || 0;
     }
 
     /**
@@ -116,7 +120,11 @@ class Particle {
 
         // Interpolate properties
         const size = this.lerp(this.sizeStart, this.sizeEnd, t);
-        const opacity = this.lerp(this.opacityStart, this.opacityEnd, t);
+        let fadeT = t;
+        if (this.fadeHold > 0) {
+            fadeT = t < this.fadeHold ? 0 : (t - this.fadeHold) / (1 - this.fadeHold);
+        }
+        const opacity = this.lerp(this.opacityStart, this.opacityEnd, fadeT);
         const color = this.lerpColor(this.colorStart, this.colorEnd, t);
 
         // Apply twinkle effect

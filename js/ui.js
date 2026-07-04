@@ -42,6 +42,17 @@ function initUI() {
     // Initialize finale modal event listeners
     initFinaleModal();
 
+    // Text-firework input visibility follows the type dropdown
+    const typeSelect = document.getElementById('firework-type');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', updateTextRowVisibility);
+    }
+
+    // Shell studio (not present on preview pages)
+    if (document.getElementById('shell-studio-modal')) {
+        initShellStudio();
+    }
+
     // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyboard);
 
@@ -91,6 +102,9 @@ function handleKeyboard(e) {
         closeShareModal();
         closeFinaleModal();
         closeSettingsModal();
+        if (document.getElementById('shell-studio-modal')) {
+            closeShellStudio();
+        }
     }
 }
 
@@ -157,7 +171,10 @@ function openAddLaunchModal() {
     document.getElementById('launch-modal-title').textContent = 'Add Firework Launch';
     document.getElementById('launch-time-min').value = Math.floor(playheadSeconds / 60);
     document.getElementById('launch-time-sec').value = playheadSeconds % 60;
+    updateShellOptions();
     document.getElementById('firework-type').value = 'chrysanthemum';
+    document.getElementById('firework-text').value = '';
+    updateTextRowVisibility();
     document.getElementById('primary-color').value = '#ff0000';
     document.getElementById('secondary-color').value = '#ffaa00';
     document.getElementById('firework-size').value = 'medium';
@@ -241,7 +258,18 @@ function openEditLaunchModal(eventId) {
     document.getElementById('launch-time-min').value = Math.floor(totalSeconds / 60);
     document.getElementById('launch-time-sec').value = totalSeconds % 60;
 
-    document.getElementById('firework-type').value = event.type;
+    updateShellOptions();
+    const typeSelect = document.getElementById('firework-type');
+    if (event.type === 'custom' && event.shellId) {
+        typeSelect.value = 'custom:' + event.shellId;
+        if (typeSelect.value !== 'custom:' + event.shellId) {
+            typeSelect.value = 'chrysanthemum'; // Shell was deleted
+        }
+    } else {
+        typeSelect.value = event.type;
+    }
+    document.getElementById('firework-text').value = event.text || '';
+    updateTextRowVisibility();
     document.getElementById('primary-color').value = event.primaryColor;
     document.getElementById('secondary-color').value = event.secondaryColor;
     document.getElementById('firework-size').value = event.size;
@@ -297,10 +325,28 @@ function saveLaunchEvent() {
         time = currentEditingOriginalTime;
     }
 
+    // Resolve type: plain type name, 'text', or 'custom:{shellId}'
+    const rawType = document.getElementById('firework-type').value;
+    let type = rawType;
+    let shellId = null;
+    let text = null;
+    if (rawType.startsWith('custom:')) {
+        type = 'custom';
+        shellId = rawType.slice(7);
+    } else if (rawType === 'text') {
+        text = document.getElementById('firework-text').value.trim();
+        if (!isValidFireworkText(text)) {
+            showToast('Enter 1-14 letters or numbers for your text firework', 'error');
+            return;
+        }
+    }
+
     const eventData = {
         time: time,
         launcherId: selectedLauncherId,
-        type: document.getElementById('firework-type').value,
+        type: type,
+        text: text,
+        shellId: shellId,
         primaryColor: document.getElementById('primary-color').value,
         secondaryColor: document.getElementById('secondary-color').value,
         size: document.getElementById('firework-size').value,
@@ -337,11 +383,29 @@ function testFireLaunch() {
 
     const launchPos = launcher.getLaunchPosition();
 
+    // Resolve type the same way saveLaunchEvent does
+    const rawType = document.getElementById('firework-type').value;
+    let type = rawType;
+    let shellId = null;
+    let text = null;
+    if (rawType.startsWith('custom:')) {
+        type = 'custom';
+        shellId = rawType.slice(7);
+    } else if (rawType === 'text') {
+        text = document.getElementById('firework-text').value.trim();
+        if (!isValidFireworkText(text)) {
+            showToast('Enter 1-14 letters or numbers first', 'error');
+            return;
+        }
+    }
+
     testFireFirework({
         launchX: launchPos.x,
         launchY: launchPos.y,
         launcherId: launcher.id,
-        type: document.getElementById('firework-type').value,
+        type: type,
+        text: text,
+        shellId: shellId,
         primaryColor: document.getElementById('primary-color').value,
         secondaryColor: document.getElementById('secondary-color').value,
         size: document.getElementById('firework-size').value,
@@ -354,10 +418,338 @@ function testFireLaunch() {
 }
 
 /**
+ * Show the text input row only when the Text type is selected
+ */
+function updateTextRowVisibility() {
+    const row = document.getElementById('text-firework-row');
+    if (row) {
+        row.style.display = document.getElementById('firework-type').value === 'text' ? '' : 'none';
+    }
+}
+
+/**
+ * Rebuild the "My Shells" optgroup in the type dropdown
+ */
+function updateShellOptions() {
+    const group = document.getElementById('my-shells-optgroup');
+    if (!group) return;
+
+    group.innerHTML = '';
+    customShells.forEach(shell => {
+        const opt = document.createElement('option');
+        opt.value = 'custom:' + shell.id;
+        opt.textContent = shell.name + ' - your design';
+        group.appendChild(opt);
+    });
+    group.style.display = customShells.length > 0 ? '' : 'none';
+}
+
+/**
+ * Display name for an event's firework type
+ */
+function eventTypeName(event) {
+    if (event.type === 'text') {
+        return '"' + (event.text || '?') + '"';
+    }
+    if (event.type === 'custom') {
+        const shell = typeof getShellById === 'function' ? getShellById(event.shellId) : null;
+        return shell ? shell.name : 'Custom Shell';
+    }
+    const typeConfig = FIREWORK_TYPES[event.type];
+    return typeConfig ? typeConfig.name : event.type;
+}
+
+/**
  * Called by the engine when all test fireworks have finished
  */
 function onTestFireworksDone() {
     document.getElementById('launch-modal').classList.remove('peek');
+    const studio = document.getElementById('shell-studio-modal');
+    if (studio) studio.classList.remove('peek');
+}
+
+// ============================================
+// SHELL STUDIO (design your own firework)
+// ============================================
+
+const SHELL_GRID = 24;
+const SHELL_CELL = 12; // Canvas pixels per cell
+let shellGrid = new Set(); // Painted cell indices (row * SHELL_GRID + col)
+let shellEditingId = null; // Shell being edited, or null for a new one
+let shellEraseMode = false;
+let shellPainting = false;
+
+function openShellStudio() {
+    shellGrid = new Set();
+    shellEditingId = null;
+    shellEraseMode = false;
+    document.getElementById('shell-name').value = '';
+    document.getElementById('shell-studio-list').value = '';
+    updateShellEraseButton();
+    refreshShellStudioList();
+    drawShellGrid();
+    document.getElementById('shell-studio-modal').style.display = 'flex';
+}
+
+function closeShellStudio() {
+    const modal = document.getElementById('shell-studio-modal');
+    modal.style.display = 'none';
+    modal.classList.remove('peek');
+}
+
+/**
+ * Populate the existing-shells dropdown in the studio
+ */
+function refreshShellStudioList() {
+    const select = document.getElementById('shell-studio-list');
+    const current = shellEditingId || '';
+    select.innerHTML = '<option value="">New shell...</option>';
+    customShells.forEach(shell => {
+        const opt = document.createElement('option');
+        opt.value = shell.id;
+        opt.textContent = shell.name;
+        select.appendChild(opt);
+    });
+    select.value = current;
+}
+
+/**
+ * Load an existing shell into the grid for editing
+ */
+function loadShellIntoStudio(shellId) {
+    shellGrid = new Set();
+    shellEditingId = null;
+    document.getElementById('shell-name').value = '';
+
+    const shell = getShellById(shellId);
+    if (shell) {
+        shellEditingId = shell.id;
+        document.getElementById('shell-name').value = shell.name;
+        const half = (SHELL_GRID - 1) / 2;
+        shell.points.forEach(p => {
+            const col = Math.round(p.x * half + half);
+            const row = Math.round(p.y * half + half);
+            if (col >= 0 && col < SHELL_GRID && row >= 0 && row < SHELL_GRID) {
+                shellGrid.add(row * SHELL_GRID + col);
+            }
+        });
+    }
+    drawShellGrid();
+}
+
+/**
+ * Render the studio grid canvas
+ */
+function drawShellGrid() {
+    const c = document.getElementById('shell-grid-canvas');
+    if (!c) return;
+    const cx = c.getContext('2d');
+
+    cx.fillStyle = '#0a0a1a';
+    cx.fillRect(0, 0, c.width, c.height);
+
+    // Grid dots
+    cx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    for (let row = 0; row < SHELL_GRID; row++) {
+        for (let col = 0; col < SHELL_GRID; col++) {
+            cx.beginPath();
+            cx.arc(col * SHELL_CELL + SHELL_CELL / 2, row * SHELL_CELL + SHELL_CELL / 2, 1, 0, Math.PI * 2);
+            cx.fill();
+        }
+    }
+
+    // Center crosshair
+    cx.strokeStyle = 'rgba(155, 89, 182, 0.25)';
+    cx.lineWidth = 1;
+    cx.beginPath();
+    cx.moveTo(c.width / 2, 0);
+    cx.lineTo(c.width / 2, c.height);
+    cx.moveTo(0, c.height / 2);
+    cx.lineTo(c.width, c.height / 2);
+    cx.stroke();
+
+    // Painted cells
+    cx.fillStyle = '#ffd700';
+    cx.shadowColor = '#ffaa00';
+    cx.shadowBlur = 5;
+    shellGrid.forEach(index => {
+        const row = Math.floor(index / SHELL_GRID);
+        const col = index % SHELL_GRID;
+        cx.beginPath();
+        cx.arc(col * SHELL_CELL + SHELL_CELL / 2, row * SHELL_CELL + SHELL_CELL / 2, 3.5, 0, Math.PI * 2);
+        cx.fill();
+    });
+    cx.shadowBlur = 0;
+
+    // Point count
+    const count = document.getElementById('shell-point-count');
+    if (count) count.textContent = shellGrid.size + ' points';
+}
+
+function shellCellFromEvent(e) {
+    const c = document.getElementById('shell-grid-canvas');
+    const rect = c.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) * (c.width / rect.width) / SHELL_CELL);
+    const row = Math.floor((e.clientY - rect.top) * (c.height / rect.height) / SHELL_CELL);
+    if (col < 0 || col >= SHELL_GRID || row < 0 || row >= SHELL_GRID) return null;
+    return row * SHELL_GRID + col;
+}
+
+function paintShellCell(e) {
+    const cell = shellCellFromEvent(e);
+    if (cell === null) return;
+    if (shellEraseMode) {
+        shellGrid.delete(cell);
+    } else {
+        shellGrid.add(cell);
+    }
+    drawShellGrid();
+}
+
+function updateShellEraseButton() {
+    const btn = document.getElementById('btn-shell-erase');
+    if (btn) {
+        btn.classList.toggle('active', shellEraseMode);
+        btn.textContent = shellEraseMode ? 'Erasing...' : 'Eraser';
+    }
+}
+
+/**
+ * Convert painted cells to normalized shell points
+ */
+function shellGridPoints() {
+    const half = (SHELL_GRID - 1) / 2;
+    const points = [];
+    shellGrid.forEach(index => {
+        const row = Math.floor(index / SHELL_GRID);
+        const col = index % SHELL_GRID;
+        points.push({
+            x: (col - half) / half,
+            y: (row - half) / half
+        });
+    });
+    return points;
+}
+
+/**
+ * Save the studio grid as a shell (updates the loaded shell, or creates new)
+ */
+function saveShellFromStudio() {
+    if (shellGrid.size < 5) {
+        showToast('Paint at least 5 points first', 'error');
+        return;
+    }
+
+    let name = document.getElementById('shell-name').value.trim().slice(0, 20);
+    if (!name) {
+        name = 'My Shell ' + (customShells.length + 1);
+    }
+
+    const points = shellGridPoints();
+    if (shellEditingId && getShellById(shellEditingId)) {
+        const shell = getShellById(shellEditingId);
+        shell.name = name;
+        shell.points = points;
+        showToast(`Shell "${name}" updated!`, 'success');
+    } else {
+        const shell = addCustomShell(name, points);
+        shellEditingId = shell.id;
+        showToast(`Shell "${name}" saved! Find it under Firework Type.`, 'success');
+    }
+
+    refreshShellStudioList();
+    updateShellOptions();
+    markDirty();
+}
+
+/**
+ * Delete the shell loaded in the studio
+ */
+function deleteShellFromStudio() {
+    if (!shellEditingId || !getShellById(shellEditingId)) {
+        showToast('Load a saved shell first', 'info');
+        return;
+    }
+
+    const used = show.events.filter(e => e.shellId === shellEditingId).length;
+    if (used > 0) {
+        showToast(`This shell is used by ${used} launch${used > 1 ? 'es' : ''}. Remove those first.`, 'error');
+        return;
+    }
+
+    const shell = getShellById(shellEditingId);
+    if (confirm(`Delete shell "${shell.name}"?`)) {
+        removeCustomShell(shellEditingId);
+        shellEditingId = null;
+        shellGrid = new Set();
+        document.getElementById('shell-name').value = '';
+        refreshShellStudioList();
+        updateShellOptions();
+        drawShellGrid();
+        markDirty();
+        showToast('Shell deleted', 'info');
+    }
+}
+
+/**
+ * Test fire the design currently painted in the studio
+ */
+function testFireShellStudio() {
+    if (shellGrid.size < 5) {
+        showToast('Paint at least 5 points first', 'error');
+        return;
+    }
+
+    const launcher = launcherManager.launchers[Math.floor(launcherManager.launchers.length / 2)];
+    if (!launcher) return;
+    const pos = launcher.getLaunchPosition();
+
+    testFireFirework({
+        launchX: pos.x,
+        launchY: pos.y,
+        launcherId: launcher.id,
+        type: 'custom',
+        shellPoints: shellGridPoints(),
+        primaryColor: '#ffd700',
+        secondaryColor: '#ffffff',
+        size: 'medium',
+        height: 'high',
+        trail: 'sparkle'
+    });
+
+    document.getElementById('shell-studio-modal').classList.add('peek');
+}
+
+/**
+ * Wire up shell studio events (only when its modal exists on the page)
+ */
+function initShellStudio() {
+    const grid = document.getElementById('shell-grid-canvas');
+
+    grid.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        shellPainting = true;
+        grid.setPointerCapture(e.pointerId);
+        paintShellCell(e);
+    });
+    grid.addEventListener('pointermove', (e) => {
+        if (shellPainting) paintShellCell(e);
+    });
+    const stop = () => { shellPainting = false; };
+    grid.addEventListener('pointerup', stop);
+    grid.addEventListener('pointercancel', stop);
+
+    document.getElementById('btn-shell-erase').addEventListener('click', () => {
+        shellEraseMode = !shellEraseMode;
+        updateShellEraseButton();
+    });
+    document.getElementById('btn-shell-clear').addEventListener('click', () => {
+        shellGrid = new Set();
+        drawShellGrid();
+    });
+    document.getElementById('shell-studio-list').addEventListener('change', (e) => {
+        loadShellIntoStudio(e.target.value);
+    });
 }
 
 /**
@@ -373,6 +765,8 @@ function duplicateEvent(eventId) {
         time: event.time + 1000,
         launcherId: event.launcherId,
         type: event.type,
+        text: event.text || null,
+        shellId: event.shellId || null,
         primaryColor: event.primaryColor,
         secondaryColor: event.secondaryColor,
         size: event.size,
@@ -588,8 +982,7 @@ const expandedGroups = new Set();
  */
 function renderEventRow(event, inGroup) {
     const timeStr = formatTimeDetailed(event.time);
-    const typeConfig = FIREWORK_TYPES[event.type];
-    const typeName = typeConfig ? typeConfig.name : event.type;
+    const typeName = eventTypeName(event);
     const isSelected = typeof isEventSelected === 'function' && isEventSelected(event.id);
 
     return `
@@ -742,7 +1135,7 @@ function updateTimelineMarkers() {
         marker.className = 'event-marker';
         marker.style.left = percentage + '%';
         marker.style.backgroundColor = event.primaryColor;
-        marker.title = `${formatTimeDetailed(event.time)} - ${FIREWORK_TYPES[event.type]?.name || event.type} (drag to move)`;
+        marker.title = `${formatTimeDetailed(event.time)} - ${eventTypeName(event)} (drag to move)`;
         marker.dataset.eventId = event.id;
         marker.addEventListener('pointerdown', onMarkerPointerDown);
         track.appendChild(marker);

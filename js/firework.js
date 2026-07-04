@@ -24,6 +24,20 @@ class Firework {
         this.size = config.size || 'medium';
         this.trailEffect = config.trail || 'sparkle';
 
+        // Custom burst points (text and user-designed shells)
+        this.shellPoints = null;
+        if (this.typeConfig && this.typeConfig.customPattern === 'points' &&
+            typeof resolveShellPoints === 'function') {
+            this.shellPoints = resolveShellPoints(config);
+            // Fall back to a classic burst if the points are missing
+            // (e.g. a deleted shell or empty text)
+            if (!this.shellPoints || this.shellPoints.length === 0) {
+                this.type = 'chrysanthemum';
+                this.typeConfig = FIREWORK_TYPES.chrysanthemum;
+                this.shellPoints = null;
+            }
+        }
+
         // Phase management
         this.phase = 'launch'; // 'launch', 'burst', 'fade', 'done'
         this.phaseTime = 0;
@@ -221,6 +235,12 @@ class Firework {
             return;
         }
 
+        // Special handling for point patterns (text and custom shells)
+        if (this.typeConfig.customPattern === 'points' && this.shellPoints) {
+            this.createPointsPattern(sizeMultiplier);
+            return;
+        }
+
         // Create particles in burst pattern
         for (let i = 0; i < particleCount; i++) {
             const particle = this.createBurstParticle(i, particleCount, sizeMultiplier, trailConfig);
@@ -292,6 +312,42 @@ class Firework {
             wiggle: config.wiggle || false,
             wiggleAmp: config.wiggleAmp,
             wiggleFreq: config.wiggleFreq
+        });
+    }
+
+    /**
+     * Create a burst that expands into a set of designed points
+     * (text fireworks and user-designed custom shells)
+     */
+    createPointsPattern(sizeMultiplier) {
+        const config = this.typeConfig;
+        const spread = (config.pointSpread || 120) * sizeMultiplier.spread;
+
+        // Velocity proportional to target offset: the pattern expands
+        // uniformly and stays recognizable. Low gravity keeps it legible.
+        const expandRate = 0.85; // Reaches full spread in ~1.2s
+
+        this.shellPoints.forEach(p => {
+            const jitterX = (Math.random() - 0.5) * 6;
+            const jitterY = (Math.random() - 0.5) * 6;
+            const lifetime = config.lifetime.min +
+                            Math.random() * (config.lifetime.max - config.lifetime.min);
+
+            this.particles.push(new Particle({
+                x: this.x,
+                y: this.y,
+                vx: (p.x * spread + jitterX) * expandRate,
+                vy: (p.y * spread + jitterY) * expandRate,
+                gravity: config.gravity,
+                lifetime: lifetime,
+                colorStart: this.primaryColor,
+                colorEnd: this.secondaryColor,
+                sizeStart: config.sizeStart * sizeMultiplier.spread,
+                sizeEnd: config.sizeEnd,
+                shape: config.shape,
+                trailLength: 0,
+                fadeHold: 0.65 // Hold full brightness so the shape stays legible
+            }));
         });
     }
 

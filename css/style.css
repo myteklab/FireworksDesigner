@@ -491,6 +491,60 @@ body {
     margin-left: 16px;
 }
 
+/* Shell Studio (design your own firework) */
+.label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.label-row label {
+    margin-bottom: 0;
+}
+
+.design-own-btn {
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.shell-studio-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.shell-list-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.shell-point-count {
+    font-size: 11px;
+    color: #888;
+    white-space: nowrap;
+}
+
+.shell-grid-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+#shell-grid-canvas {
+    border: 1px solid #2d2d4a;
+    border-radius: 8px;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+#btn-shell-erase.active {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    color: #fff;
+    border-color: #9b59b6;
+}
+
 /* Grand ending toggle in the finale modal */
 .grand-ending-toggle {
     display: flex;

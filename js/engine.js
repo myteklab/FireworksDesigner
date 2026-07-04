@@ -603,6 +603,8 @@ function renderShowPreview() {
                 launchX: pos.x,
                 launchY: pos.y,
                 type: e.type,
+                text: e.text,
+                shellId: e.shellId,
                 primaryColor: e.primaryColor,
                 secondaryColor: e.secondaryColor,
                 size: e.size,

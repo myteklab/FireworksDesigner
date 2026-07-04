@@ -36,7 +36,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Firework Type</label>
+                    <div class="label-row">
+                        <label>Firework Type</label>
+                        <button type="button" class="btn btn-secondary btn-xs design-own-btn" onclick="openShellStudio()">&#127912; Design Your Own</button>
+                    </div>
                     <select id="firework-type" class="form-select">
                         <optgroup label="Classic">
                             <option value="chrysanthemum">Chrysanthemum - Classic spherical burst</option>
@@ -57,8 +60,17 @@
                             <option value="spider">Spider - Long burning legs</option>
                             <option value="pistil">Pistil - Double burst with glowing core</option>
                             <option value="fish">Fish - Wiggling sparks that swim</option>
+                            <option value="text">Text - Bursts into a word you choose</option>
+                        </optgroup>
+                        <optgroup id="my-shells-optgroup" label="My Shells" style="display: none;">
+                            <!-- Custom shells populated dynamically -->
                         </optgroup>
                     </select>
+                </div>
+
+                <div class="form-group" id="text-firework-row" style="display: none;">
+                    <label>Your Text</label>
+                    <input type="text" id="firework-text" class="form-select" maxlength="14" placeholder="e.g. WOW or a name" autocomplete="off">
                 </div>
 
                 <div class="form-row">
@@ -201,6 +213,43 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="closeSettingsModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shell Studio Modal (design your own firework) -->
+    <div id="shell-studio-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Shell Studio</h2>
+                <button class="modal-close" onclick="closeShellStudio()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-hint">Paint the pattern your firework bursts into. Draw a star, a face, your initials, anything!</p>
+
+                <div class="shell-studio-toolbar">
+                    <select id="shell-studio-list" class="form-select shell-list-select">
+                        <option value="">New shell...</option>
+                    </select>
+                    <button id="btn-shell-erase" class="btn btn-sm btn-secondary">Eraser</button>
+                    <button id="btn-shell-clear" class="btn btn-sm btn-secondary">Clear</button>
+                    <span id="shell-point-count" class="shell-point-count">0 points</span>
+                </div>
+
+                <div class="shell-grid-wrap">
+                    <canvas id="shell-grid-canvas" width="288" height="288"></canvas>
+                </div>
+
+                <div class="form-group">
+                    <label>Shell Name</label>
+                    <input type="text" id="shell-name" class="form-select" maxlength="20" placeholder="e.g. Smiley" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-accent" style="margin-right: auto;" onclick="testFireShellStudio()" title="Preview this design right now">&#127878; Test Fire</button>
+                <button class="btn btn-danger" onclick="deleteShellFromStudio()" title="Delete the loaded shell">Delete</button>
+                <button class="btn btn-secondary" onclick="closeShellStudio()">Close</button>
+                <button class="btn btn-primary" onclick="saveShellFromStudio()">Save Shell</button>
             </div>
         </div>
     </div>
@@ -568,6 +617,7 @@
     </script>
     <script src="js/particle.js"></script>
     <script src="js/types.js"></script>
+    <script src="js/shells.js"></script>
     <script src="js/weather.js"></script>
     <script src="js/firework.js"></script>
     <script src="js/launcher.js"></script>

@@ -249,6 +249,40 @@ const FIREWORK_TYPES = {
         wiggleFreq: 9
     },
 
+    text: {
+        name: 'Text',
+        description: 'Bursts into a word you choose',
+        particleCount: { small: 0, medium: 0, large: 0 }, // Count comes from the glyph points
+        spread: 360,
+        speed: { min: 0, max: 0 },
+        gravity: 8,
+        lifetime: { min: 2.4, max: 3.4 },
+        shape: 'circle',
+        sizeStart: 4,
+        sizeEnd: 2,
+        trailLength: 0,
+        hasSecondaryBurst: false,
+        customPattern: 'points',
+        pointSpread: 150
+    },
+
+    custom: {
+        name: 'Custom Shell',
+        description: 'Bursts into a pattern you designed',
+        particleCount: { small: 0, medium: 0, large: 0 }, // Count comes from the shell points
+        spread: 360,
+        speed: { min: 0, max: 0 },
+        gravity: 8,
+        lifetime: { min: 2.4, max: 3.4 },
+        shape: 'circle',
+        sizeStart: 4,
+        sizeEnd: 2,
+        trailLength: 0,
+        hasSecondaryBurst: false,
+        customPattern: 'points',
+        pointSpread: 120
+    },
+
     spider: {
         name: 'Spider',
         description: 'Long burning legs radiating outward',
@@ -387,9 +421,12 @@ function getCustomPalette(colors) {
 /**
  * Get a random firework type
  */
+// Types that need extra data (text, shell points) and are excluded from
+// random selection and finale generation
+const SPECIAL_TYPES = ['comet', 'text', 'custom'];
+
 function getRandomFireworkType() {
     const types = Object.keys(FIREWORK_TYPES);
-    // Exclude comet from random selection (it's special)
-    const filteredTypes = types.filter(t => t !== 'comet');
+    const filteredTypes = types.filter(t => !SPECIAL_TYPES.includes(t));
     return filteredTypes[Math.floor(Math.random() * filteredTypes.length)];
 }

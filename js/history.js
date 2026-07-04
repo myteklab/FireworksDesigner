@@ -32,6 +32,8 @@ function deepCloneState() {
             size: e.size,
             height: e.height,
             trail: e.trail,
+            text: e.text || null,
+            shellId: e.shellId || null,
             group: e.group || null,
             groupLabel: e.groupLabel || null
         })),
@@ -330,7 +332,9 @@ function copySelectedEvents() {
         secondaryColor: e.secondaryColor,
         size: e.size,
         height: e.height,
-        trail: e.trail
+        trail: e.trail,
+        text: e.text || null,
+        shellId: e.shellId || null
     }));
 
     showToast(`Copied ${copiedEvents.length} event${copiedEvents.length > 1 ? 's' : ''} (Ctrl+V to paste)`, 'success');
@@ -366,7 +370,9 @@ function pasteEvents() {
             secondaryColor: e.secondaryColor,
             size: e.size,
             height: e.height,
-            trail: e.trail
+            trail: e.trail,
+            text: e.text || null,
+            shellId: e.shellId || null
         });
         pastedIds.push(newEvent.id);
     });
@@ -411,7 +417,9 @@ function duplicateSelectedEvents() {
             secondaryColor: e.secondaryColor,
             size: e.size,
             height: e.height,
-            trail: e.trail
+            trail: e.trail,
+            text: e.text || null,
+            shellId: e.shellId || null
         });
         duplicatedIds.push(newEvent.id);
     });

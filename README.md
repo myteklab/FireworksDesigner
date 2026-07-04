@@ -4,7 +4,9 @@ Design and choreograph your own fireworks shows with custom timing, effects, and
 
 ## Features
 
-- 16 firework types: Chrysanthemum, Willow, Palm, Peony, Crackle, Ring, Heart, Comet, Crossette, Brocade, Strobe, Waterfall, Saturn, Spider, Pistil, Fish
+- 17 firework types: Chrysanthemum, Willow, Palm, Peony, Crackle, Ring, Heart, Comet, Crossette, Brocade, Strobe, Waterfall, Saturn, Spider, Pistil, Fish, Text
+- Text fireworks that burst into a word you choose
+- Shell Studio: paint your own burst pattern on a grid and use it as a firework
 - Click the sky to add a firework right where you want it
 - Test Fire button to preview a firework design before adding it
 - Timeline-based show choreography with precise timing

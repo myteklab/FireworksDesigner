@@ -2,6 +2,8 @@
 
 Design and choreograph your own fireworks shows with custom timing, effects, and colors.
 
+**Try it in your browser, no account needed:** [mytekdev.com/tools/fireworks-designer](https://mytekdev.com/tools/fireworks-designer). The page has a live demo and explains what students learn from it.
+
 ## Features
 
 - 17 firework types: Chrysanthemum, Willow, Palm, Peony, Crackle, Ring, Heart, Comet, Crossette, Brocade, Strobe, Waterfall, Saturn, Spider, Pistil, Fish, Text

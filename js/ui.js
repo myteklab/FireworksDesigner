@@ -19,6 +19,14 @@ function initUI() {
     // Schedule buttons
     document.getElementById('btn-add-launch').addEventListener('click', openAddLaunchModal);
     document.getElementById('btn-add-finale').addEventListener('click', addFinale);
+    // Built here rather than in index.html so the platform wrapper copy of the markup needs no edit
+    const groupBtn = document.createElement('button');
+    groupBtn.id = 'btn-add-group';
+    groupBtn.className = 'btn btn-secondary btn-sm';
+    groupBtn.title = 'Put launches together in a named group';
+    groupBtn.textContent = '+ Group';
+    groupBtn.addEventListener('click', () => openGroupModal(null));
+    document.getElementById('btn-add-launch').after(groupBtn);
     const surpriseBtn = document.getElementById('btn-surprise');
     if (surpriseBtn) {
         surpriseBtn.addEventListener('click', surpriseMe);
@@ -833,7 +841,9 @@ function duplicateEvent(eventId) {
         secondaryColor: event.secondaryColor,
         size: event.size,
         height: event.height,
-        trail: event.trail
+        trail: event.trail,
+        group: event.group || null,
+        groupLabel: event.groupLabel || null
     });
 
     if (typeof selectEvent === 'function') {
@@ -1000,14 +1010,15 @@ function surpriseMe() {
 }
 
 /**
- * Delete an entire event group (finale)
+ * Delete an entire event group and the fireworks in it
  */
 function deleteGroup(groupId) {
     const members = show.events.filter(e => e.group === groupId);
     if (members.length === 0) return;
+    const label = members[0].groupLabel || 'this group';
 
-    if (confirm(`Delete this finale (${members.length} fireworks)?`)) {
-        if (typeof saveState === 'function') saveState('Delete Finale');
+    if (confirm(`Delete "${label}" and its ${members.length} firework${members.length === 1 ? '' : 's'}?`)) {
+        if (typeof saveState === 'function') saveState('Delete Group');
         members.forEach(e => {
             show.removeEvent(e.id);
             if (typeof selectedEventIds !== 'undefined') {
@@ -1017,8 +1028,164 @@ function deleteGroup(groupId) {
         expandedGroups.delete(groupId);
         refreshEventList();
         markDirty();
-        showToast('Finale deleted', 'info');
+        showToast('Group deleted', 'info');
     }
+}
+
+function escapeText(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const GROUP_NAME_MAX = 30;
+
+// Group being edited in the group window; null while making a new one
+let groupModalId = null;
+
+function suggestGroupName() {
+    const taken = new Set(show.events.filter(e => e.group).map(e => (e.groupLabel || '').toLowerCase()));
+    let n = 1;
+    while (taken.has('group ' + n)) n++;
+    return 'Group ' + n;
+}
+
+function ensureGroupModal() {
+    if (document.getElementById('group-modal')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'group-modal';
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'none';
+    overlay.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="group-modal-title">New Group</h2>
+                <button class="modal-close" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="group-name-input">Group name</label>
+                    <input type="text" id="group-name-input" class="form-input" maxlength="${GROUP_NAME_MAX}" autocomplete="off" placeholder="Opening, Big Bang, Finale...">
+                </div>
+                <div class="form-group">
+                    <div class="label-row">
+                        <label>Launches in this group</label>
+                        <span class="group-pick-count" id="group-pick-count"></span>
+                    </div>
+                    <div class="group-pick-list" id="group-pick-list"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="btn-group-ungroup" style="margin-right: auto;" title="Remove the group but keep its fireworks">Ungroup</button>
+                <button class="btn btn-secondary" id="btn-group-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-group-save">Save Group</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.modal-close').addEventListener('click', closeGroupModal);
+    overlay.querySelector('#btn-group-cancel').addEventListener('click', closeGroupModal);
+    overlay.querySelector('#btn-group-save').addEventListener('click', saveGroupModal);
+    overlay.querySelector('#btn-group-ungroup').addEventListener('click', ungroupFromModal);
+    overlay.querySelector('#group-pick-list').addEventListener('change', updateGroupPickCount);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeGroupModal(); });
+    // The app's shortcuts listen on document, so Backspace here would delete the selected launches
+    overlay.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Escape') closeGroupModal();
+        if (e.key === 'Enter' && e.target.id === 'group-name-input') saveGroupModal();
+    });
+}
+
+function openGroupModal(groupId) {
+    if (show.events.length === 0) {
+        showToast('Add some launches first, then put them in a group', 'info');
+        return;
+    }
+    ensureGroupModal();
+    groupModalId = groupId || null;
+
+    const existing = groupId ? show.events.find(e => e.group === groupId) : null;
+    document.getElementById('group-modal-title').textContent = groupId ? 'Edit Group' : 'New Group';
+    document.getElementById('btn-group-ungroup').style.display = groupId ? '' : 'none';
+
+    const nameInput = document.getElementById('group-name-input');
+    nameInput.value = existing ? (existing.groupLabel || '') : suggestGroupName();
+
+    const rows = show.getEventList().map(e => {
+        const checked = groupId ? e.group === groupId : isEventSelected(e.id);
+        const elsewhere = e.group && e.group !== groupId
+            ? `<span class="group-pick-tag">in ${escapeText(e.groupLabel || 'a group')}</span>` : '';
+        return `
+            <label class="group-pick-row">
+                <input type="checkbox" value="${e.id}"${checked ? ' checked' : ''}>
+                <span class="event-time">${formatTimeDetailed(e.time)}</span>
+                <span class="event-launcher">${e.launcherId}</span>
+                <span class="event-color" style="background: linear-gradient(135deg, ${e.primaryColor} 50%, ${e.secondaryColor} 50%)"></span>
+                <span class="event-type">${escapeText(eventTypeName(e))}</span>
+                ${elsewhere}
+            </label>`;
+    });
+    document.getElementById('group-pick-list').innerHTML = rows.join('');
+    updateGroupPickCount();
+
+    document.getElementById('group-modal').style.display = 'flex';
+    nameInput.focus();
+    nameInput.select();
+}
+
+function closeGroupModal() {
+    const modal = document.getElementById('group-modal');
+    if (modal) modal.style.display = 'none';
+    groupModalId = null;
+}
+
+function updateGroupPickCount() {
+    const n = document.querySelectorAll('#group-pick-list input:checked').length;
+    document.getElementById('group-pick-count').textContent = n + ' ticked';
+}
+
+function saveGroupModal() {
+    const picked = new Set(Array.from(document.querySelectorAll('#group-pick-list input:checked')).map(cb => cb.value));
+    if (picked.size === 0) {
+        showToast(groupModalId ? 'Tick at least one launch, or press Ungroup' : 'Tick at least one launch for this group', 'error');
+        return;
+    }
+    const name = document.getElementById('group-name-input').value.trim().slice(0, GROUP_NAME_MAX) || suggestGroupName();
+    const groupId = groupModalId || ('grp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+
+    if (typeof saveState === 'function') saveState(groupModalId ? 'Edit Group' : 'Make Group');
+    show.events.forEach(e => {
+        if (picked.has(e.id)) {
+            e.group = groupId;
+            e.groupLabel = name;
+        } else if (e.group === groupId) {
+            e.group = null;
+            e.groupLabel = null;
+        }
+    });
+
+    expandedGroups.add(groupId);
+    closeGroupModal();
+    refreshEventList();
+    markDirty();
+    showToast(`"${name}" has ${picked.size} launch${picked.size === 1 ? '' : 'es'}`, 'success');
+}
+
+function ungroupFromModal() {
+    const groupId = groupModalId;
+    if (!groupId) return;
+    if (typeof saveState === 'function') saveState('Ungroup');
+    show.events.forEach(e => {
+        if (e.group === groupId) {
+            e.group = null;
+            e.groupLabel = null;
+        }
+    });
+    expandedGroups.delete(groupId);
+    closeGroupModal();
+    refreshEventList();
+    markDirty();
+    showToast('Group removed. Its fireworks are still in the show.', 'info');
 }
 
 /**
@@ -1114,14 +1281,14 @@ function refreshEventList() {
         return;
     }
 
-    // Collect grouped events (finales); the group renders as one collapsible row
+    // Collect grouped events; the group renders as one collapsible row
     // positioned where its first event occurs
     const groups = {};
     const sequence = [];
     events.forEach(event => {
         if (event.group) {
             if (!groups[event.group]) {
-                groups[event.group] = { label: event.groupLabel || 'Group', events: [] };
+                groups[event.group] = { label: escapeText(event.groupLabel || 'Group'), events: [] };
                 sequence.push({ kind: 'group', groupId: event.group });
             }
             groups[event.group].events.push(event);
@@ -1149,7 +1316,8 @@ function refreshEventList() {
                 <span class="group-label">&#127878; ${group.label}</span>
                 <span class="group-count">${group.events.length} &middot; to ${formatTimeDetailed(last.time)}</span>
                 <div class="event-actions">
-                    <button class="event-action-btn delete" onclick="event.stopPropagation(); deleteGroup('${item.groupId}')" title="Delete entire finale">&#128465;</button>
+                    <button class="event-action-btn" onclick="event.stopPropagation(); openGroupModal('${item.groupId}')" title="Rename or change this group">&#9998;</button>
+                    <button class="event-action-btn delete" onclick="event.stopPropagation(); deleteGroup('${item.groupId}')" title="Delete this group and its fireworks">&#128465;</button>
                 </div>
             </div>
         `;
@@ -1225,7 +1393,7 @@ function updateTimelineMarkers() {
     // Remove existing group bands
     track.querySelectorAll('.group-band').forEach(b => b.remove());
 
-    // Group bands: one draggable block per finale/movement
+    // Group bands: one draggable block per group
     const bands = {};
     show.events.forEach(event => {
         if (!event.group) return;
@@ -1558,7 +1726,9 @@ function openShareModal(shareUrl) {
  * Close share modal
  */
 function closeShareModal() {
-    document.getElementById('share-modal').style.display = 'none';
+    // The share modal left the page, and a throw here stopped Escape closing the other modals
+    const modal = document.getElementById('share-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 /**

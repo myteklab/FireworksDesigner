@@ -336,7 +336,9 @@ function copySelectedEvents() {
         trail: e.trail,
         launchSound: e.launchSound || 'whistle',
         text: e.text || null,
-        shellId: e.shellId || null
+        shellId: e.shellId || null,
+        group: e.group || null,
+        groupLabel: e.groupLabel || null
     }));
 
     showToast(`Copied ${copiedEvents.length} event${copiedEvents.length > 1 ? 's' : ''} (Ctrl+V to paste)`, 'success');
@@ -375,7 +377,9 @@ function pasteEvents() {
             trail: e.trail,
             launchSound: e.launchSound || 'whistle',
             text: e.text || null,
-            shellId: e.shellId || null
+            shellId: e.shellId || null,
+            group: e.group || null,
+            groupLabel: e.groupLabel || null
         });
         pastedIds.push(newEvent.id);
     });
@@ -423,7 +427,9 @@ function duplicateSelectedEvents() {
             trail: e.trail,
             launchSound: e.launchSound || 'whistle',
             text: e.text || null,
-            shellId: e.shellId || null
+            shellId: e.shellId || null,
+            group: e.group || null,
+            groupLabel: e.groupLabel || null
         });
         duplicatedIds.push(newEvent.id);
     });

@@ -570,6 +570,8 @@ function refreshShellStudioList() {
     }
 
     select.value = shellEditingId || current || '';
+    // The remembered shell may be the one just deleted
+    if (select.selectedIndex < 0) select.value = '';
 }
 
 /**
@@ -1008,7 +1010,7 @@ async function surpriseMe() {
         if (!ok) return;
     }
 
-    if (typeof saveState === 'function') saveState('Surprise Show');
+    if (typeof saveState === 'function') saveState('Surprise Show', { scenery: true });
 
     show.clearEvents();
     if (typeof clearSelection === 'function') clearSelection();
@@ -1859,6 +1861,8 @@ function copyShareLink() {
  */
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
+    // Three at most, so a burst of actions does not bury the schedule
+    while (container.children.length >= 3) container.firstElementChild.remove();
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;

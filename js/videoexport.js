@@ -55,7 +55,10 @@ async function startVideoExport() {
         title: 'Record a video?',
         message: `Your show plays from the start while it records, so this takes ${formatTime(show.duration)}` +
             (songSetsLength ? ' (the length of your song)' : '') +
-            '. The video downloads when the show ends. Keep this tab open, or press Cancel at the top to stop.',
+            (typeof window.saveExportedVideo === 'function'
+                ? '. When the show ends, the video is saved to your Files.'
+                : '. When the show ends, the video downloads.') +
+            ' Keep this tab open, or press Cancel at the top to stop.',
         okText: 'Start Recording'
     });
     if (!ok || videoExport.recording) return;

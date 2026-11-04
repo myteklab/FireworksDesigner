@@ -55,12 +55,18 @@ function deepCloneState() {
  * Save current state to undo stack before making changes
  * @param {string} actionName - Description of the action for UI feedback
  */
-function saveState(actionName) {
+function saveState(actionName, opts = {}) {
     // Don't save state during undo/redo operations
     if (isUndoRedoAction) return;
 
     const state = deepCloneState();
     state.actionName = actionName;
+    // Scenery is only part of the snapshot for actions that change it (Surprise Me).
+    // Snapshotting it everywhere would make undoing a launch also undo a backdrop
+    // picked in Settings since, because Settings changes are not undo steps.
+    if (opts.scenery && typeof getScenerySettings === 'function') {
+        state.scenery = getScenerySettings();
+    }
 
     undoStack.push(state);
 
@@ -106,6 +112,10 @@ function restoreState(state) {
         newLauncher.enabled = savedLauncher.enabled;
     }
 
+    if (state.scenery && typeof loadScenerySettings === 'function') {
+        loadScenerySettings(state.scenery);
+    }
+
     // Restore duration
     show.duration = state.duration;
 
@@ -130,6 +140,7 @@ function undo() {
     // Save current state to redo stack
     const currentState = deepCloneState();
     currentState.actionName = undoStack[undoStack.length - 1]?.actionName || 'Action';
+    if (undoStack[undoStack.length - 1]?.scenery) currentState.scenery = getScenerySettings();
     redoStack.push(currentState);
 
     // Pop and restore previous state
@@ -155,6 +166,7 @@ function redo() {
     // Save current state to undo stack
     const currentState = deepCloneState();
     currentState.actionName = redoStack[redoStack.length - 1]?.actionName || 'Action';
+    if (redoStack[redoStack.length - 1]?.scenery) currentState.scenery = getScenerySettings();
     undoStack.push(currentState);
 
     // Pop and restore redo state

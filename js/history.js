@@ -16,6 +16,10 @@ let lastSelectedEventId = null; // For shift-click range selection
 // Copy/Paste buffer
 let copiedEvents = [];
 
+const IS_MAC = /mac/i.test(navigator.platform || navigator.userAgent);
+const MOD_KEY = IS_MAC ? 'Cmd' : 'Ctrl';
+const REDO_KEYS = IS_MAC ? 'Cmd+Shift+Z' : 'Ctrl+Y';
+
 /**
  * Deep clone the current state for undo/redo
  */
@@ -189,15 +193,15 @@ function updateUndoRedoButtons() {
     if (undoBtn) {
         undoBtn.disabled = !canUndo();
         undoBtn.title = canUndo()
-            ? `Undo: ${undoStack[undoStack.length - 1]?.actionName} (Ctrl+Z)`
-            : 'Nothing to undo (Ctrl+Z)';
+            ? `Undo: ${undoStack[undoStack.length - 1]?.actionName} (${MOD_KEY}+Z)`
+            : `Nothing to undo (${MOD_KEY}+Z)`;
     }
 
     if (redoBtn) {
         redoBtn.disabled = !canRedo();
         redoBtn.title = canRedo()
-            ? `Redo: ${redoStack[redoStack.length - 1]?.actionName} (Ctrl+Y)`
-            : 'Nothing to redo (Ctrl+Y)';
+            ? `Redo: ${redoStack[redoStack.length - 1]?.actionName} (${REDO_KEYS})`
+            : `Nothing to redo (${REDO_KEYS})`;
     }
 }
 
@@ -341,7 +345,7 @@ function copySelectedEvents() {
         groupLabel: e.groupLabel || null
     }));
 
-    showToast(`Copied ${copiedEvents.length} event${copiedEvents.length > 1 ? 's' : ''} (Ctrl+V to paste)`, 'success');
+    showToast(`Copied ${copiedEvents.length} event${copiedEvents.length > 1 ? 's' : ''} (${MOD_KEY}+V to paste)`, 'success');
 }
 
 /**
@@ -349,7 +353,7 @@ function copySelectedEvents() {
  */
 function pasteEvents() {
     if (copiedEvents.length === 0) {
-        showToast('Nothing to paste - copy events first (Ctrl+C)', 'error');
+        showToast(`Nothing to paste. Copy launches first (${MOD_KEY}+C)`, 'error');
         return;
     }
 
@@ -504,8 +508,7 @@ function initKeyboardShortcuts() {
         // Don't process shortcuts when typing (except Escape above)
         if (isTyping) return;
 
-        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+        const ctrlKey = IS_MAC ? e.metaKey : e.ctrlKey;
 
         // Ctrl+Z - Undo
         if (ctrlKey && e.key === 'z' && !e.shiftKey) {

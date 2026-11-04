@@ -115,6 +115,8 @@ function setMusicTrack(trackId) {
         }
         updateBpmBadge();
         drawTimelineWaveform();
+        // Markers and group bands are placed by percent of the show, which just shrank
+        if (typeof updateTimelineMarkers === 'function') updateTimelineMarkers();
         return;
     }
 

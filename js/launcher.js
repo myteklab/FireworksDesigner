@@ -295,9 +295,15 @@ class LauncherManager {
             return null; // Max launchers reached
         }
 
-        // Default position: center of canvas
+        // Default position: the middle of the widest empty stretch. The center
+        // is usually taken, and a launcher on top of another one hides it
         if (x === null) {
-            x = this.canvasWidth / 2;
+            const edges = [30, ...this.launchers.map(l => l.x).sort((a, b) => a - b), this.canvasWidth - 30];
+            let best = 0;
+            for (let i = 1; i < edges.length - 1; i++) {
+                if (edges[i + 1] - edges[i] > edges[best + 1] - edges[best]) best = i;
+            }
+            x = (edges[best] + edges[best + 1]) / 2;
         }
 
         // Clamp to canvas bounds

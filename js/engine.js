@@ -511,7 +511,7 @@ function render(timestamp) {
     // Update and draw launchers (always, so flash/spark effects animate
     // regardless of playback state)
     launcherManager.update(cappedDt);
-    launcherManager.draw(ctx);
+    launcherManager.draw(ctx, selectedLauncherForRemoval ? selectedLauncherForRemoval.id : null);
 
     // Continue render loop
     requestAnimationFrame(render);

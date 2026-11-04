@@ -27,7 +27,7 @@ function isVideoExportSupported() {
  * Start recording: plays the show from the beginning at 1x and records
  * until it finishes (or the user stops/cancels).
  */
-function startVideoExport() {
+async function startVideoExport() {
     if (videoExport.recording) return;
 
     if (show.events.length === 0) {
@@ -48,6 +48,17 @@ function startVideoExport() {
         showToast('Video recording is not supported in this browser', 'error');
         return;
     }
+
+    const musicMs = (typeof getMusicDurationMs === 'function') ? getMusicDurationMs() : 0;
+    const songSetsLength = musicMs > 0 && musicMs >= show.duration;
+    const ok = await askConfirm({
+        title: 'Record a video?',
+        message: `Your show plays from the start while it records, so this takes ${formatTime(show.duration)}` +
+            (songSetsLength ? ' (the length of your song)' : '') +
+            '. The video downloads when the show ends. Keep this tab open, or press Cancel at the top to stop.',
+        okText: 'Start Recording'
+    });
+    if (!ok || videoExport.recording) return;
 
     // Canvas video + a tap on the master audio bus
     const stream = canvas.captureStream(30);

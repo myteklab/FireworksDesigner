@@ -185,8 +185,14 @@ function openAddLaunchModal() {
     // Update launcher buttons first
     updateLauncherSelectButtons();
 
-    // Reset form. Default the launch time to the playhead position.
-    const playheadSeconds = Math.round((show ? show.currentTime : 0) / 1000);
+    // Reset form. Default the launch time to the playhead position. A stopped
+    // playhead at 0:00 usually means nobody moved it, so follow on from the last
+    // launch instead of stacking every new firework at the start.
+    let startMs = show ? show.currentTime : 0;
+    if (show && !show.isPlaying && startMs === 0 && show.events.length > 0) {
+        startMs = Math.max(...show.events.map(e => e.time)) + 1000;
+    }
+    const playheadSeconds = Math.round(startMs / 1000);
     document.getElementById('launch-modal-title').textContent = 'Add Firework Launch';
     document.getElementById('launch-time-min').value = Math.floor(playheadSeconds / 60);
     document.getElementById('launch-time-sec').value = playheadSeconds % 60;
@@ -1065,8 +1071,9 @@ const GROUP_NAME_MAX = 30;
 let groupModalId = null;
 
 function suggestGroupName() {
-    const taken = new Set(show.events.filter(e => e.group).map(e => (e.groupLabel || '').toLowerCase()));
-    let n = 1;
+    const withGroup = show.events.filter(e => e.group);
+    const taken = new Set(withGroup.map(e => (e.groupLabel || '').toLowerCase()));
+    let n = new Set(withGroup.map(e => e.group)).size + 1;
     while (taken.has('group ' + n)) n++;
     return 'Group ' + n;
 }

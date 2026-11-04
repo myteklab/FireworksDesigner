@@ -745,7 +745,13 @@ function deleteShellFromStudio() {
     }
 
     const shell = getShellById(shellEditingId);
-    if (confirm(`Delete shell "${shell.name}"?`)) {
+    askConfirm({
+        title: 'Delete shell?',
+        message: `"${shell.name}" will be removed from My Shells.`,
+        okText: 'Delete Shell',
+        danger: true
+    }).then(ok => {
+        if (!ok) return;
         removeCustomShell(shellEditingId);
         shellEditingId = null;
         shellGrid = new Set();
@@ -755,7 +761,7 @@ function deleteShellFromStudio() {
         drawShellGrid();
         markDirty();
         showToast('Shell deleted', 'info');
-    }
+    });
 }
 
 /**
@@ -859,7 +865,13 @@ function duplicateEvent(eventId) {
  * Delete a launch event
  */
 function deleteEvent(eventId) {
-    if (confirm('Delete this firework launch?')) {
+    askConfirm({
+        title: 'Delete launch?',
+        message: 'This firework will be removed from the show. Undo brings it back.',
+        okText: 'Delete',
+        danger: true
+    }).then(ok => {
+        if (!ok) return;
         // Save state before delete
         if (typeof saveState === 'function') saveState('Delete Launch');
         show.removeEvent(eventId);
@@ -870,7 +882,7 @@ function deleteEvent(eventId) {
         refreshEventList();
         markDirty();
         showToast('Firework deleted', 'info');
-    }
+    });
 }
 
 /**
@@ -980,9 +992,14 @@ function generateFinale() {
 /**
  * Surprise Me: compose and play a complete show in one click
  */
-function surpriseMe() {
-    if (show.events.length > 0 && !confirm('Replace your current show with a surprise show?')) {
-        return;
+async function surpriseMe() {
+    if (show.events.length > 0) {
+        const ok = await askConfirm({
+            title: 'Replace your show?',
+            message: 'Surprise Me makes a whole new show and replaces the launches you have now. Undo brings yours back.',
+            okText: 'Surprise Me'
+        });
+        if (!ok) return;
     }
 
     if (typeof saveState === 'function') saveState('Surprise Show');
@@ -1017,7 +1034,13 @@ function deleteGroup(groupId) {
     if (members.length === 0) return;
     const label = members[0].groupLabel || 'this group';
 
-    if (confirm(`Delete "${label}" and its ${members.length} firework${members.length === 1 ? '' : 's'}?`)) {
+    askConfirm({
+        title: 'Delete group?',
+        message: `"${label}" and its ${members.length} firework${members.length === 1 ? '' : 's'} will be removed from the show. To keep the fireworks, use the pencil and Ungroup instead.`,
+        okText: 'Delete Group',
+        danger: true
+    }).then(ok => {
+        if (!ok) return;
         if (typeof saveState === 'function') saveState('Delete Group');
         members.forEach(e => {
             show.removeEvent(e.id);
@@ -1029,7 +1052,7 @@ function deleteGroup(groupId) {
         refreshEventList();
         markDirty();
         showToast('Group deleted', 'info');
-    }
+    });
 }
 
 function escapeText(str) {
@@ -1223,7 +1246,13 @@ function clearAllEvents() {
         return;
     }
 
-    if (confirm('Clear all firework launches?')) {
+    askConfirm({
+        title: 'Clear all launches?',
+        message: `All ${show.events.length} launch${show.events.length === 1 ? '' : 'es'} will be removed from the show. Undo brings them back.`,
+        okText: 'Clear All',
+        danger: true
+    }).then(ok => {
+        if (!ok) return;
         // Save state before clear
         if (typeof saveState === 'function') saveState('Clear All');
         show.clearEvents();
@@ -1232,7 +1261,68 @@ function clearAllEvents() {
         refreshEventList();
         markDirty();
         showToast('All events cleared', 'info');
+    });
+}
+
+/**
+ * In-app replacement for confirm(). Resolves true for the OK button or Enter,
+ * false for Cancel, the close button, a click outside, or Escape.
+ */
+function askConfirm({ title, message, okText = 'OK', cancelText = 'Cancel', danger = false }) {
+    let overlay = document.getElementById('confirm-modal');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'confirm-modal';
+        overlay.className = 'modal-overlay confirm-overlay';
+        overlay.style.display = 'none';
+        overlay.innerHTML = `
+            <div class="modal-content confirm-content" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+                <div class="modal-header">
+                    <h2 id="confirm-title"></h2>
+                    <button class="modal-close" data-answer="no" title="Close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-message" class="confirm-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="confirm-cancel" data-answer="no"></button>
+                    <button class="btn" id="confirm-ok" data-answer="yes"></button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
     }
+
+    overlay.querySelector('#confirm-title').textContent = title;
+    overlay.querySelector('#confirm-message').textContent = message;
+    overlay.querySelector('#confirm-cancel').textContent = cancelText;
+    const okBtn = overlay.querySelector('#confirm-ok');
+    okBtn.textContent = okText;
+    okBtn.className = 'btn ' + (danger ? 'btn-danger-solid' : 'btn-primary');
+
+    return new Promise(resolve => {
+        const finish = answer => {
+            overlay.style.display = 'none';
+            overlay.removeEventListener('click', onClick);
+            overlay.removeEventListener('keydown', onKey);
+            resolve(answer);
+        };
+        const onClick = e => {
+            if (e.target === overlay) return finish(false);
+            const btn = e.target.closest('[data-answer]');
+            if (btn) finish(btn.dataset.answer === 'yes');
+        };
+        // Keys stay inside the window: the app's Delete and Escape shortcuts live on document
+        const onKey = e => {
+            e.stopPropagation();
+            if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        };
+        overlay.addEventListener('click', onClick);
+        overlay.addEventListener('keydown', onKey);
+        overlay.style.display = 'flex';
+        okBtn.focus();
+    });
 }
 
 // Groups the user has expanded in the schedule list (collapsed by default)

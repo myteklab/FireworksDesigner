@@ -1750,3 +1750,33 @@ body {
     font-size: 12px;
     color: #888;
 }
+
+/* Confirm window: asked from inside other windows too, so it sits above them */
+.modal-overlay.confirm-overlay {
+    z-index: 2000;
+}
+
+.confirm-content {
+    max-width: 400px;
+}
+
+.confirm-message {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #d8d8e8;
+}
+
+.btn-danger-solid {
+    background: #c0392b;
+    color: #fff;
+}
+
+.btn-danger-solid:hover,
+.btn-danger-solid:focus-visible {
+    background: #e74c3c;
+}
+
+.btn:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
